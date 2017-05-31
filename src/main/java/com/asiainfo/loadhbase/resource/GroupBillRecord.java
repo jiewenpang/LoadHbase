@@ -1,4 +1,4 @@
-package com.asiainfo.bean.bill;
+package com.asiainfo.loadhbase.resource;
 
 import java.io.BufferedReader;
 import java.util.ArrayList;
@@ -6,16 +6,14 @@ import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
-import com.asiainfo.base.HbaseHelper;
-import com.asiainfo.bean.Base;
-import com.asiainfo.bean.list.BOSSDeal;
 
-public class GroupBillDeal extends Base {
-	static final Log LOG = LogFactory.getLog(GroupBillDeal.class);
-	
+public class GroupBillRecord extends Record {
+	public static final Log LOG = LogFactory.getLog(GroupBillRecord.class);
 	public static final String START = "START|"; // 账单起始位置
 	public static final String END = "END"; // 账单结束位置
 
@@ -32,7 +30,9 @@ public class GroupBillDeal extends Base {
 	 * 集团新总账单私有
 	 */
 	private String new_GroupId; // 集团编码
+	private String new_Name; // 客户名称
 	private String new_BillMonth; // 计费月
+
 	/**
 	 * 集团明细账单私有
 	 */
@@ -59,46 +59,37 @@ public class GroupBillDeal extends Base {
 	}
 
 	@Override
-	public int buildRecord(HTable table, String filename, BufferedReader br) throws Exception {
+	public int buildRecord(String filename, BufferedReader br, Connection connection) throws Exception {
 		int billcount = 0; // 统计集团账单的条数
 		String line = "";
 		boolean bflag = false; // 标识账单此条账单是否有错误，如果有错，则整条账单不在组装，直接组装下一条
 		StringBuilder body = new StringBuilder();
 		String head = "";
+		Table table = null;
 
-		getFileType(filename); // 验证文件类型,获取该文件的地市信息 JTEJZD_NEWGZ201606
-		String tmptname = null; // 存储表日期
-		// 根据文件的日期建hbase表 JTEJZD_NEWGZ201606 返回 201606
-		String tanameame = filename.split("_")[1].substring(5, 11); // 获取集团总账单文件日期
-		String taname = new String(table.getTableName()); // 得到已经存在的集团总账单表的日期
-		if (taname.endsWith(tanameame)) {
-			//表已经存在更新当前表名
-			tmptname = taname.substring(0, taname.length()-6) + tanameame; //GROUPBILL_201606
-		} else {
-			LOG.info("current file start with=" + taname.substring(0, taname.length()-6) + "end with = " + tanameame);
-			if(mapTable.containsKey(tanameame) == false){
-				if (getRegions().length > 1 || !"".equals(getRegions()[0])) {
-					byte[][] regs = new byte[getRegions().length][];
-					for (int j = 0; j < getRegions().length; j++) {
-						regs[j] = Bytes.toBytes(getRegions()[j]);
-					}
-					HbaseHelper.creatTable(taname.substring(0, taname.length()-6) + tanameame, getFamilyNames(), regs);
-				} else {
-					HbaseHelper.creatTable(taname.substring(0, taname.length()-6) + tanameame, getFamilyNames(), null);
+		getFileType(filename); 
+		
+		String tableName = tablePrefix + filename.split("_")[1].substring(5, 11);
+		System.out.println("currTableName:" + tableName);
+		
+		table = mapTable.get(tableName);
+		if (table == null) {
+			if (getRegions().length > 1 || !"".equals(getRegions()[0])) {
+				byte[][] regs = new byte[getRegions().length][];
+				for (int j = 0; j < getRegions().length; j++) {
+					regs[j] = Bytes.toBytes(getRegions()[j]);
 				}
-				// 更新Htable信息
-				table = new HTable(HbaseHelper.conf, Bytes.toBytes(taname.substring(0, taname.length()-6) + tanameame));
-				table.setAutoFlush(false);
-				table.flushCommits();
-				mapTable.put(tanameame, table);
-			}else{
-				table = mapTable.get(tanameame);
+				creatTable(tableName, getFamilyNames(), regs, connection);
+			} else {
+				creatTable(tableName, getFamilyNames(), null, connection);
 			}
-			tmptname = taname.substring(0, taname.length()-6) + tanameame; // 更新当前表信息
-		}
-		// 设置表名
-		setTabName(tmptname);
 
+			table = connection.getTable(TableName.valueOf(tableName));
+			((HTable) table).setAutoFlushTo(false);
+			((HTable) table).flushCommits();
+			mapTable.put(tableName, table);
+		} 
+		
 		while (((line = br.readLine()) != null)) {
 			if (line.startsWith(START)) {
 				head = line.substring(START.length(), line.length()); // START|
@@ -108,23 +99,26 @@ public class GroupBillDeal extends Base {
 				continue;
 			}
 
+			// System.out.println("billcount="+billcount);
+
 			// 账单体解析
 			if (BILL_TYPE == 1 || BILL_TYPE == 2) {
 				if ((!line.matches(".*\\|.*\\|.*") || line.split("\\|", -1).length != 3) && !line.startsWith(END)) {
-					LOG.error("current type=" + BILL_TYPE + " error context:" + line);
+					System.out.println("current type=" + BILL_TYPE + " error context:" + line);
 					bflag = true;
 				}
 			} else {
-				//集团代付账单数据长短不一
+				// 集团代付账单 长度不一
 				if (!line.matches(".*\\|.*\\|.*") && !line.startsWith(END)) {
-					LOG.error("current type=" + BILL_TYPE + " error context:" + line);
+					// System.out.println("current type="+BILL_TYPE+" error context:"
+					// + line);
 					bflag = true;
 				}
 			}
 
 			if (bflag) {
-				LOG.error("continue body");
-				continue; // 不再拼接账单体，跳过处理下一用户
+				// System.out.println("continue body");
+				continue; // 不再拼接账单体
 			} else {
 				String reDelimitedLine = line.replace(DELIMITER, BODY_ITEM_DELIMITER);
 				if (!line.startsWith(END)) {
@@ -135,16 +129,14 @@ public class GroupBillDeal extends Base {
 			// 账单尾部;入库操作
 			if (line.equals(END)) {
 				billcount++;
-				
 				// 设置列值
 				setValues(new String[] { head, _area, body.toString() });
-
 				// 入库
-				HbaseHelper.addData(table, getHBaseRowKey(), getFamilyNames()[0], getColumns(), getValues(), "GBK");
+				addColumn(table, getHBaseRowKey(), getFamilyNames()[0], getColumns(), getValues(), "GBK");
 
 			}
 		}
-		table.flushCommits();
+		((HTable) table).flushCommits();
 		br.close();
 		return billcount;
 	}
@@ -155,32 +147,35 @@ public class GroupBillDeal extends Base {
 			List<String> split = split(header, '|');
 
 			if (BILL_TYPE == 1) {
-				//集团总账单
-				//集团编码|集团客户名称|计费月|打印日期|收件人姓名|用户EMAIL地址1~用户EMAIL地址2~... ... ~用户EMAIL地址n
-				this.new_GroupId = promisedGet(split, 0); // 集团编号
+				// 集团总账单
+				// 集团编码|集团客户名称|计费月|打印日期|收件人姓名|用户EMAIL地址1~用户EMAIL地址2~... ...
+				// ~用户EMAIL地址n
+				this.new_GroupId = promisedGet(split, 0); // 集团编码
+				this.new_Name = promisedGet(split, 1); // 集团客户名称
 				this.new_BillMonth = promisedGet(split, 2); // 计费月
 			}
 			if (BILL_TYPE == 2) {
-				//集团明细账单
-				//集团编码|集团客户名称|集团产品编码|集团产品名称|计费周期|账户信息时段|计费时段|打印日期|收件人姓名|用户EMAIL地址1~用户EMAIL地址2~... ... ~用户EMAIL地址n
-				this.detail_GroupId = promisedGet(split, 0);  //集团编码
+				// 集团明细账单
+				// 集团编码|集团客户名称|集团产品编码|集团产品名称|计费周期|账户信息时段|计费时段|打印日期|收件人姓名|用户EMAIL地址1~用户EMAIL地址2~...
+				// ... ~用户EMAIL地址n
+				this.detail_GroupId = promisedGet(split, 0);// 产品编码
 				this.detail_ProductId = promisedGet(split, 2);// 集团产品编码
-				this.detail_BillWeek = promisedGet(split, 4);// 计费月
-
+				this.detail_BillWeek = promisedGet(split, 4);// 计费周期
 			}
 			if (BILL_TYPE == 3) {
-				//集团代付账单
-				if(get_area().equalsIgnoreCase("SZ")){
-					//集团编号|集团名称|邮编|联系人地址(城市名称)|联系人|集团代付产品号码|计费月|打印日期|
-					this.df_GroupId=promisedGet(split, 0); //集团编号
-					this.df_Product=promisedGet(split, 5); //产品编号
-					this.df_BillMonth=promisedGet(split, 6); //计费月
-				}else{
-					//集团产品编号|集团产品名称|集团编号|集团名称|邮编|联系人地址|联系人|联系人手机|计费月|打印日期|
-					this.df_GroupId=promisedGet(split, 2); //集团编号
-					this.df_Product=promisedGet(split, 0); //产品编号
-					this.df_BillMonth=promisedGet(split, 8); //计费月
+				// 集团代付账单
+				if (get_area().equalsIgnoreCase("SZ")) {
+					// 集团编号|集团名称|邮编|联系人地址(城市名称)|联系人|集团代付产品号码|计费月|打印日期|
+					this.df_GroupId = promisedGet(split, 0); // 集团编号
+					this.df_Product = promisedGet(split, 5); // 产品编号
+					this.df_BillMonth = promisedGet(split, 6); // 计费月
+				} else {
+					// 集团产品编号|集团产品名称|集团编号|集团名称|邮编|联系人地址|联系人|联系人手机|计费月|打印日期|
+					this.df_GroupId = promisedGet(split, 2); // 集团编号
+					this.df_Product = promisedGet(split, 0); // 产品编号
+					this.df_BillMonth = promisedGet(split, 8); // 计费月
 				}
+
 			}
 
 		}
@@ -209,7 +204,7 @@ public class GroupBillDeal extends Base {
 			}
 
 			/**
-			 * 集团编码|产品编码|账单类型|计费周期|地市
+			 * 集团编码|产品编码|集团账单类型|计费周期|地市
 			 */
 			if (BILL_TYPE == 2) {
 				sb.append(getDetail_GroupId());
@@ -223,7 +218,7 @@ public class GroupBillDeal extends Base {
 				sb.append(get_area());
 			}
 
-			// 集团编码|产品编号|类型|计费月|地市
+			// 集团编码|集团产品编号|集团账单类型|计费月|地市
 			if (BILL_TYPE == 3) {
 				sb.append(getDf_GroupId());
 				sb.append('|');
@@ -237,6 +232,7 @@ public class GroupBillDeal extends Base {
 			}
 			// code....
 		}
+		// System.out.println("TYPE="+BILL_TYPE+"  "+sb.toString());
 		return sb.toString();
 	}
 
@@ -257,7 +253,7 @@ public class GroupBillDeal extends Base {
 			} else if (fileName.contains("JTDFZD")) {
 				BILL_TYPE = 3;
 			} else {
-				LOG.error("无此账单类型");
+				System.out.println("无此账单类型");
 				return;
 			}
 
@@ -290,10 +286,10 @@ public class GroupBillDeal extends Base {
 		int start = 0;
 		while (start < line.length()) {
 			int end = line.indexOf(del, start);
-			//如果indexOf取值超出最大长度将会返回-1 ,end等于值得最大长度
 			if (end == -1) {
 				end = line.length();
 			}
+			// System.out.println("split = " + line.substring(start, end));
 			ret.add(line.substring(start, end));
 			start = end + 1;
 		}
@@ -314,6 +310,14 @@ public class GroupBillDeal extends Base {
 
 	public void setNew_GroupId(String new_GroupId) {
 		this.new_GroupId = new_GroupId;
+	}
+
+	public String getNew_Name() {
+		return new_Name;
+	}
+
+	public void setNew_Name(String new_Name) {
+		this.new_Name = new_Name;
 	}
 
 	public String getNew_BillMonth() {

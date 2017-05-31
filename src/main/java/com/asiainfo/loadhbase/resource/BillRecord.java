@@ -1,20 +1,23 @@
-package com.asiainfo.bean.bill;
+package com.asiainfo.loadhbase.resource;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
 
-import com.asiainfo.base.HbaseHelper;
-import com.asiainfo.bean.Base;
-
-public class BillDeal extends Base {
+public class BillRecord extends Record {
+	static final Log LOG = LogFactory.getLog(BillRecord.class);
 	public static final String START = "START|";
 	public static final String END = "END";
-	
+
 	public static int ACCNO_INDEX = 0;
 	public static int USERID_INDEX = 1;
 	public static int MOBNO_INDEX = 2;
@@ -22,13 +25,13 @@ public class BillDeal extends Base {
 	public static int VERSION_INDEX = -5;
 	public static int TYPE_INDEX = -4;
 	public static int OLD_BILL_LENGTH = 20;
-	
+
 	public static final char DELIMITER = '|';
 	public static final char BODY_ITEM_DELIMITER = '^';
-	
+
 	private boolean _isGroupBill = false;
 	private boolean _isOldBill = false;
-	
+
 	private String _mobNo;
 	private String _accNo;
 	private String _userId;
@@ -36,123 +39,107 @@ public class BillDeal extends Base {
 	private String _version;
 	private String _type;
 	private String _area;
-	
+
 	@Override
 	public boolean checkFileName(String name) {
 		/**
 		 * CXBILL、HWBILL、CXBILLNEW、HWBILLNEW、CXFLOWBILL、HWFLOWBILL
 		 */
-		boolean flag=false;
-		if(name.toUpperCase().startsWith("CXBILL_") || name.toUpperCase().startsWith("HWBILL_") ||
-		   name.toUpperCase().startsWith("CXBILLNEW_") || name.toUpperCase().startsWith("HWBILLNEW_") ||
-		   name.toUpperCase().startsWith("CXFLOWBILL_") || name.toUpperCase().startsWith("HWFLOWBILL_")){
-			flag=true;
+		boolean flag = false;
+		if (name.toUpperCase().startsWith("CXBILL_") || name.toUpperCase().startsWith("HWBILL_")
+				|| name.toUpperCase().startsWith("CXBILLNEW_") || name.toUpperCase().startsWith("HWBILLNEW_")
+				|| name.toUpperCase().startsWith("CXFLOWBILL_") || name.toUpperCase().startsWith("HWFLOWBILL_")) {
+			flag = true;
 		}
 		return flag;
 	}
 
-
 	@Override
-	public int buildRecord(HTable table,
-			   String filename,
-			   BufferedReader br) throws Exception {
+	public int buildRecord(String filename, BufferedReader br, Connection connection) throws Exception {
 		int billcount = 0;
 		String line = "";
-        boolean bflag = false;  //标识账单此条账单是否有错误，如果有错，则整条账单不在组装，直接组装下一条
-        StringBuilder body = new StringBuilder();
-        String head = "";
-        
-        getFileType(filename);
-        //按文件名的日期建表
-        
-        String tmptname = null;
-		String tanameame = filename.split("_")[2].substring(0, 6);
-		String taname = new String(table.getTableName());
-		if(taname.endsWith(tanameame)) {
-			//表已经存在，不需要重新创建
-			tmptname = taname.substring(0, taname.length() - 6) + tanameame;
-		}else{
-			System.out.println("currFileMonth:" + tanameame);
-			if ( mapTable.containsKey(tanameame) == false ){
-				System.out.println("开始创建表: "+taname.substring(0, taname.length() - 6) + tanameame);
-				if(getRegions().length > 1 || !"".equals(getRegions()[0])){
-					byte[][] regs = new byte[getRegions().length][];
-					for(int j = 0;j < getRegions().length; j++){
-						regs[j] = Bytes.toBytes(getRegions()[j]);
-					}
-					HbaseHelper.creatTable(taname.substring(0, taname.length() - 6) + tanameame, getFamilyNames(), regs);
-				}else{
-					HbaseHelper.creatTable(taname.substring(0, taname.length() - 6) + tanameame, getFamilyNames(), null);
+		boolean bflag = false; // 标识账单此条账单是否有错误，如果有错，则整条账单不在组装，直接组装下一条
+		StringBuilder body = new StringBuilder();
+		String head = "";
+		Table table = null;
+
+		getFileType(filename);
+		// 按文件名的日期建表
+
+		String tableName = tablePrefix + filename.split("_")[2].substring(0, 6);
+		System.out.println("currTableName:" + tableName);
+		
+		table = mapTable.get(tableName);
+		if (table == null) {
+			if (getRegions().length > 1 || !"".equals(getRegions()[0])) {
+				byte[][] regs = new byte[getRegions().length][];
+				for (int j = 0; j < getRegions().length; j++) {
+					regs[j] = Bytes.toBytes(getRegions()[j]);
 				}
-				table = new HTable(HbaseHelper.conf, Bytes.toBytes(taname.substring(0, taname.length() - 6) + tanameame));
-				table.setAutoFlush(false);
-				table.flushCommits();
-				mapTable.put(tanameame, table);
-			}else {
-				table = mapTable.get(tanameame);
+				creatTable(tableName, getFamilyNames(), regs, connection);
+			} else {
+				creatTable(tableName, getFamilyNames(), null, connection);
 			}
-			tmptname = taname.substring(0, taname.length() - 6) + tanameame;
-		}
-		//设置表名
-		setTabName(tmptname);
-	
+
+			table = connection.getTable(TableName.valueOf(tableName));
+			((HTable) table).setAutoFlushTo(false);
+			((HTable) table).flushCommits();
+			mapTable.put(tableName, table);
+		} 
+		
 		
 		while (((line = br.readLine()) != null)) {
-			//账单头解析
+
+			// 账单头解析
 			if (line.startsWith(START)) {
 				head = line.substring(START.length(), line.length());
-				//解析账单头
+				// 解析账单头
 				parseHeader(head);
-//				body.delete(0, body.length());  //清空之前body数据
-				body.setLength(0); //清空之前body数据  效率稍微好点
+				// body.delete(0, body.length()); //清空之前body数据
+				body.setLength(0); // 清空之前body数据 效率稍微好点
 				bflag = false;
 				continue;
-    		}
-    		
-    		//账单体解析
-			if ((!line.matches(".*\\|.*\\|.*") || line.split("\\|",-1).length != 3) && 
-				 !line.startsWith(END)) {
-				System.out.println("error mobile:"+get_mobNo()+"error context:"+line);
+			}
+
+			// 账单体解析
+			if ((!line.matches(".*\\|.*\\|.*") || line.split("\\|", -1).length != 3) && !line.startsWith(END)) {
+				System.out.println("error mobile:" + get_mobNo() + "error context:" + line);
 				bflag = true;
 			}
-			
-			if(bflag) {
-				continue; //不再拼接账单体
+
+			if (bflag) {
+				continue; // 不再拼接账单体
 			} else {
 				String reDelimitedLine = line.replace(DELIMITER, BODY_ITEM_DELIMITER);
-				if(!line.startsWith(END))
+				if (!line.startsWith(END))
 					body.append(reDelimitedLine).append("|");
 			}
-			
-			//账单尾部;入库操作
-    		if(line.equals(END)) {
-    			billcount++;
-    			
-    			//设置列名
-/*				if(getColumns() == null || getColumns().length<=0) {
-					setColumns(new String[]{"Header","Area","Body"});
-				}*/
-				
-				//设置列值
-				setValues(new String[]{head,_area,body.toString()});
-				
-				//入库
-				HbaseHelper.addData(table,
-						getHBaseRowKey(),
-						getFamilyNames()[0],
-						getColumns(),
-						getValues(),
-						"GBK");
-				
-    		}
+
+			// 账单尾部;入库操作
+			if (line.equals(END)) {
+				billcount++;
+
+				/*
+				 * //设置列名 if(getColumns() == null || getColumns().length<=0) {
+				 * setColumns(new String[]{"Header","Area","Body"}); }
+				 */
+
+				// 设置列值
+				setValues(new String[] { head, _area, body.toString() });
+
+				// 入库
+				addColumn(table, getHBaseRowKey(), getFamilyNames()[0], getColumns(), getValues(), "GBK");
+
+			}
 		}
-		table.flushCommits();
+		((HTable) table).flushCommits();
 		br.close();
 		return billcount;
 	}
 
 	/**
 	 * 获取rowkey
+	 * 
 	 * @return
 	 */
 	public String getHBaseRowKey() {
@@ -180,9 +167,10 @@ public class BillDeal extends Base {
 		}
 		return sb.toString();
 	}
-	
+
 	/**
 	 * 从账单头获取相关讯息
+	 * 
 	 * @param header
 	 */
 	private void parseHeader(String header) {
@@ -200,11 +188,14 @@ public class BillDeal extends Base {
 			this._type = promisedGet(split, TYPE_INDEX);
 		}
 	}
-	
+
 	/**
 	 * 获取集合中元素
-	 * @param split 源数据
-	 * @param index 索引位置
+	 * 
+	 * @param split
+	 *            源数据
+	 * @param index
+	 *            索引位置
 	 * @return
 	 */
 	private String promisedGet(List<String> split, int index) {
@@ -216,14 +207,14 @@ public class BillDeal extends Base {
 		}
 		return (String) split.get(index);
 	}
-	
+
 	/**
 	 * 根据文件名获取文件类型
+	 * 
 	 * @param fileName
 	 * @throws IOException
 	 */
-	public void getFileType(String fileName)
-			throws IOException {
+	public void getFileType(String fileName) throws IOException {
 		if (fileName.startsWith("JT")) {
 			this._isGroupBill = true;
 			this._area = "";
@@ -237,13 +228,12 @@ public class BillDeal extends Base {
 			this._area = fileName.split("_")[1];
 		}
 	}
-	
+
 	private List<String> split(String line, char del) {
 		List<String> ret = new ArrayList<String>();
 		int start = 0;
 		while (start < line.length()) {
 			int end = line.indexOf(del, start);
-			//如果indexOf取值超出最大长度将会返回-1 ,end等于值得最大长度
 			if (end == -1) {
 				end = line.length();
 			}
@@ -308,7 +298,5 @@ public class BillDeal extends Base {
 	public void set_area(String _area) {
 		this._area = _area;
 	}
-	
-	
 
 }

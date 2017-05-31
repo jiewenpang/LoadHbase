@@ -1,4 +1,4 @@
-package com.asiainfo.QuerySrv_MA;
+package com.asiainfo.loadhbase;
 
 import junit.framework.Test;
 import junit.framework.TestCase;

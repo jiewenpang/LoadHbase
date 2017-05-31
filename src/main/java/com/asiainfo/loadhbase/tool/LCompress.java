@@ -1,4 +1,4 @@
-package com.asiainfo.tool;
+package com.asiainfo.loadhbase.tool;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
@@ -7,6 +7,7 @@ import java.io.FileOutputStream;
 import java.nio.ByteBuffer;
 
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hdfs.util.ByteArray;
 
 
 public class LCompress{

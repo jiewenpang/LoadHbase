@@ -1,10 +1,7 @@
-package com.asiainfo.tool;
-
+package com.asiainfo.loadhbase.tool;
 
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -20,13 +17,12 @@ import org.apache.commons.net.ftp.FTPClient;
 import org.apache.commons.net.ftp.FTPClientConfig;
 import org.apache.commons.net.ftp.FTPFile;
 import org.apache.commons.net.ftp.FTPReply;
-
-import com.asiainfo.base.DealMap;
-import com.asiainfo.bean.FileInfo;
-import com.asiainfo.bean.Base;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+
+import com.asiainfo.loadhbase.handler.BaseHandler;
+import com.asiainfo.loadhbase.resource.Record;
+
 
 public class FtpTools {
 	static final Log LOG = LogFactory.getLog(FtpTools.class);
@@ -217,7 +213,7 @@ public class FtpTools {
 		
 	}*/
 	
-	public List<String> getMapList(Base base){
+	public List<String> getMapList(Record base){
 		List<String> result=new ArrayList<String>();
 		try {
 			List<String> files = this.getFileList();
@@ -232,10 +228,9 @@ public class FtpTools {
 		return result;
 	}
 	//ssh获取文件列表
-	public List<String> getMapList(Base base, String cmd){
+	public List<String> getMapList(Record base, String cmd){
 		List<String> result = new ArrayList<String>();
 		try {
-			
 			List<String> files = sshClient.getFileList(cmd);
 //			List<String> files = this.getFileList(content.getHostname(), content.getUsername(), content.getPassword(), content.getCmd());
 			for(String fname : files){
@@ -243,13 +238,12 @@ public class FtpTools {
 					result.add(new StringBuilder().append(this.ip).append(":").append(this.port).append(":").append(this.username).append(":").append(this.password).append(":").append(this.dir).append(":").append(fname).toString());
 			}
 		} catch (Exception e) {
-			//
 			LOG.info("getMapList:" + e.getMessage());
 		}
 		return result;
 	}
 	//ssh获取文件列表和各个文件大小
-	public Long getMapList(Base base, String cmd, List<FileInfo> fileinfos){
+	public Long getMapList(Record base, String cmd, List<BaseHandler.FileInfo> fileinfos){
 		List<String> files = sshClient.getFileList(cmd);
 		Long totalsize = 0l;
 		int linenum = 0;
@@ -260,17 +254,16 @@ public class FtpTools {
 					continue;
 				}
 				String[] fnames = fname.split("\\|");
-				totalsize += Integer.valueOf(fnames[0]);
-					
+				totalsize += Long.valueOf(fnames[0]);
+				
 				if(base.checkFileName(fnames[1])){
-					FileInfo fileinfo = new FileInfo();
-					fileinfo.setSize(Integer.valueOf(fnames[0]));
+					BaseHandler.FileInfo fileinfo = new BaseHandler.FileInfo();
+					fileinfo.setSize(Long.valueOf(fnames[0]));
 					fileinfo.setFileinfo(new StringBuilder().append(this.ip).append(":").append(this.port).append(":").append(this.username).append(":").append(this.password).append(":").append(this.dir).append(":").append(fnames[1]).append(":").append(fnames[0]).toString());
 					fileinfos.add(fileinfo);
 				}
 			}
 		} catch (NumberFormatException e) {
-			// TODO Auto-generated catch block
 			LOG.info("getMapList:" + e.getMessage());
 		}
 		return totalsize;
@@ -288,8 +281,8 @@ public class FtpTools {
 		ftpClient.enterLocalPassiveMode();
 		byte[] ctx;
 		ftpClient.setFileType(FTP.BINARY_FILE_TYPE);
-		LOG.info("download2Buf filename:" + filename);
 		this.ftpClient.retrieveFile(new String(filename.getBytes("GBK"), "iso-8859-1"), bos);
+		LOG.info("download2Buf filename:" + filename);
 		bos.flush();
 		LOG.info("flush");
 		ctx = bout.toByteArray();
@@ -344,17 +337,17 @@ public class FtpTools {
 	public void disConnect() throws IOException{
 		this.ftpClient.disconnect();
 	}
-
+	
 	/**
-	 * ftp 写文件
+	 * ftp 文件续传
 	 * */
-	public boolean writeFile(InputStream is, String dir, String fileName) throws IOException{
+	public boolean writeFile(InputStream is, String detaildir, String fileName) throws IOException{
 		
 		if(null == is){
 			return false;
 		}
          // 指定写入的目录  
-		if(ftpClient.changeWorkingDirectory(dir) || (ftpClient.makeDirectory(dir) && ftpClient.changeWorkingDirectory(dir))) {
+		if(ftpClient.changeWorkingDirectory(detaildir) || (ftpClient.makeDirectory(detaildir) && ftpClient.changeWorkingDirectory(detaildir))) {
 			// 写操作 
 			ftpClient.setFileType(FTPClient.BINARY_FILE_TYPE);
 			FTPFile[] files = ftpClient.listFiles(fileName);
@@ -362,10 +355,15 @@ public class FtpTools {
 				Long size = files[0].getSize();
 				ftpClient.setRestartOffset(size); 
 			} 
-			return ftpClient.storeFile(new String(fileName.getBytes("GBK"), "iso-8859-1"), is);
+			
+			boolean bReturn =  ftpClient.storeFile(new String(fileName.getBytes("GBK"), "iso-8859-1"), is);
+			ftpClient.changeWorkingDirectory(dir);
+			
+			return bReturn;
 			
 		} else  {
 			return false;
 		}
 	}
+
 }
