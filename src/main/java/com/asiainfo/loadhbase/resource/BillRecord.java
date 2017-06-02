@@ -5,16 +5,16 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class BillRecord extends Record {
-	static final Log LOG = LogFactory.getLog(BillRecord.class);
+	protected static final Logger logger = LoggerFactory.getLogger(BillRecord.class);
 	public static final String START = "START|";
 	public static final String END = "END";
 
@@ -68,7 +68,7 @@ public class BillRecord extends Record {
 
 		String tableName = tablePrefix + filename.split("_")[2].substring(0, 6);
 		System.out.println("currTableName:" + tableName);
-		
+
 		table = mapTable.get(tableName);
 		if (table == null) {
 			if (getRegions().length > 1 || !"".equals(getRegions()[0])) {
@@ -85,9 +85,8 @@ public class BillRecord extends Record {
 			((HTable) table).setAutoFlushTo(false);
 			((HTable) table).flushCommits();
 			mapTable.put(tableName, table);
-		} 
-		
-		
+		}
+
 		while (((line = br.readLine()) != null)) {
 
 			// 账单头解析
@@ -124,11 +123,9 @@ public class BillRecord extends Record {
 				 * setColumns(new String[]{"Header","Area","Body"}); }
 				 */
 
-				// 设置列值
-				setValues(new String[] { head, _area, body.toString() });
-
 				// 入库
-				addColumn(table, getHBaseRowKey(), getFamilyNames()[0], getColumns(), getValues(), "GBK");
+				addColumn(table, getHBaseRowKey(), getFamilyNames()[0], getColumns(),
+						new String[] { head, _area, body.toString() }, "GBK");
 
 			}
 		}

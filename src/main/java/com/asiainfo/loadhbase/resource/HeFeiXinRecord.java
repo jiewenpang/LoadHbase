@@ -4,8 +4,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.MasterNotRunningException;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.ZooKeeperConnectionException;
@@ -13,9 +11,11 @@ import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HeFeiXinRecord extends Record {
-	public static final Log LOG = LogFactory.getLog(HeFeiXinRecord.class);
+	protected static final Logger logger = LoggerFactory.getLogger(HeFeiXinRecord.class);
 	public static final String END = "90";
 	private static int MAX_SEQ_LENGTH = 9;
 
@@ -36,7 +36,7 @@ public class HeFeiXinRecord extends Record {
 		String line = ""; // 每行数据
 		Table table = null;
 		String tableName = null;
-		
+
 		try {
 			while ((line = br.readLine()) != null) {
 				linenum++;
@@ -44,7 +44,7 @@ public class HeFeiXinRecord extends Record {
 				if (linenum == 1) {
 					tableName = tablePrefix + filename.substring(3, 9);
 					System.out.println("currTableName:" + tableName);
-					
+
 					table = mapTable.get(tableName);
 					if (table == null) {
 						if (getRegions().length > 1 || !"".equals(getRegions()[0])) {
@@ -61,11 +61,11 @@ public class HeFeiXinRecord extends Record {
 						((HTable) table).setAutoFlushTo(false);
 						((HTable) table).flushCommits();
 						mapTable.put(tableName, table);
-					} 
-					
+					}
+
 					continue;
 				}
-				
+
 				// 过滤尾行数据
 				if (END.equals(line.substring(0, 2))) {
 					break;
@@ -74,28 +74,26 @@ public class HeFeiXinRecord extends Record {
 				// 设置行键
 				StringBuilder hsb = new StringBuilder();
 				hsb.append(getIdentity(line.substring(172, 300))).append("|").append(setStartTime(line)).append("|")
-					.append(filename).append("|").append(getSeqString(linenum));
-				
-				// 设置列值
-				setValues(new String[] { line });
+						.append(filename).append("|").append(getSeqString(linenum));
 
 				// 入库
-				addColumn(table, getIdentity(line.substring(172, 300)), getFamilyNames()[0], getColumns(), getValues(), null);
+				addColumn(table, getIdentity(line.substring(172, 300)), getFamilyNames()[0], getColumns(),
+						new String[] { line }, null);
 
 			}
 			((HTable) table).flushCommits();
 
-			LOG.info("end buildRecord");
+			logger.info("end buildRecord");
 		} catch (MasterNotRunningException e) {
-			LOG.error("MasterNotRunningException:" + e.getMessage());
+			logger.error("MasterNotRunningException:" + e.getMessage());
 			throw new InterruptedException();
 		} catch (ZooKeeperConnectionException e) {
-			LOG.error("ZooKeeperConnectionException:" + e.getMessage());
+			logger.error("ZooKeeperConnectionException:" + e.getMessage());
 			throw new InterruptedException();
 		} catch (UnsupportedEncodingException e) {
-			LOG.error("UnsupportedEncodingException:" + e.getMessage());
+			logger.error("UnsupportedEncodingException:" + e.getMessage());
 		} catch (IOException e) {
-			LOG.error("IOException:" + e.getMessage());
+			logger.error("IOException:" + e.getMessage());
 		} finally {
 			if (null != br) {
 				try {

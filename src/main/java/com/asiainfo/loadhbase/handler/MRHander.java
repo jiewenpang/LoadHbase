@@ -20,8 +20,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.commons.net.ftp.FTPFile;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -40,6 +38,8 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.asiainfo.loadhbase.MainApp;
 import com.asiainfo.loadhbase.resource.Record;
@@ -48,142 +48,173 @@ import com.asiainfo.loadhbase.tool.LCompress;
 
 public class MRHander extends BaseHandler {
 
-	protected String name;
 	protected int tdnum;
 	protected String input;
 	protected String inputlarge;
-	protected String fileNamePrefix;
-	// Mapper每台机子的运行线程数，最好是CPU逻辑单元-1，但是也要考虑FTP连接容量
-	protected int maptasks;
-	protected String userName;
-	protected boolean distributeMode;
-	// 1表示备份，0表示不备份
 	protected String isbakinput;
-	// -1表示无需出明细文件
-	protected String detailoutputdir;
+	protected boolean isShardByFileNum;
 	protected String bakdir;
 	protected String largesize;
+	protected int maptasks;
+	protected String detailoutputdir;
 
 	@Override
 	public void run() throws Exception {
+		initProperty();
 
+		// 获取输入文件信息列表
 		List<FileInfo> fileInfoList = new ArrayList<FileInfo>();
-		Long totalsize = GetEveryFiles(fileInfoList);
-		int filenum = fileInfoList.size();
-		Long avgfilesize = totalsize / maptotalnum; // 每个map处理的文件总大小
-		if (filenum == 0) {
+		Long totalSize = GetEveryFileInfo(fileInfoList);
+		int fileNum = fileInfoList.size();
+		if (fileNum == 0) {
 			logger.info("task finish,quit!");
 			return;
 		}
-		logger.info("ftp list finish:" + filenum + ",avgfilesize:" + avgfilesize + "");
+		logger.info("Get fileInfoList success, fileNum:" + fileNum);
+
+		// 输入文件信息分批存放到hdfs的中间文件列表，每个文件对应一个map任务
 		Path inputpath = new Path(input);
-		FileSystem fs = FileSystem.get(hbaseConfiguration);
+		FileInfoToHDFS(inputpath, fileInfoList, totalSize / maptotalnum, isShardByFileNum);
+		logger.info("Put fileInfoList to hdfs success");
 
-		if (!fs.exists(inputpath)) {
-			fs.mkdirs(inputpath);
-			fs.mkdirs(inputpath, new FsPermission("777"));
-		} else {
-			logger.info("input file existed!clean...");
-			fs.delete(inputpath, true);
-			logger.info("clean finish...create folder");
-			fs.mkdirs(inputpath);
-			fs.mkdirs(inputpath, new FsPermission("777"));
+		// 作业集群参数配置
+		JobConf jobConf = new JobConf(hbaseConfiguration);
+		IndividuationJobConf(jobConf);
+		jobConf.setNumMapTasks(fileNum / tdnum);
+
+		Job job = Job.getInstance(jobConf);
+		ConfigJob(job);
+		FileInputFormat.addInputPath(job, inputpath);
+		logger.info("Config Job success");
+
+		// 执行任务
+		long beginTime = System.currentTimeMillis();
+		String result = (job.waitForCompletion(true)) ? "Excute job success!" : "Excute job fail!";
+		fileSystem.delete(inputpath, true);
+		long totalTime = (System.currentTimeMillis() - beginTime) / 1000;
+		logger.info(result + " total time(s):" + totalTime);
+	}
+
+	private void FileInfoToHDFS(Path inputPath, List<FileInfo> fileInfos, Long avgfilesize, boolean isShardByFileNum)
+			throws InterruptedException, IOException {
+
+		if (fileSystem.exists(inputPath)) {
+			fileSystem.delete(inputPath, true);
 		}
+		fileSystem.mkdirs(inputPath, new FsPermission("777"));
 
-		InputHDFS(tdnum, input, fs, fileInfoList, avgfilesize, 2);
+		// 有两种策略，按文件数量和文件大小划分任务
+		int begPos = 0, endPos = 0, size = fileInfos.size();
+		ExecutorService pool = Executors.newFixedThreadPool(50);
+		if (isShardByFileNum) {
+			for (begPos = 0; begPos < size; begPos += tdnum) {
+				endPos = begPos + tdnum;
+				if (begPos + tdnum > size) {
+					endPos = size;
+				}
+				pool.execute(new CreatHDFSFile(fileSystem, input, fileInfos, begPos, endPos));
+			}
 
-		logger.info("config Job begin..");
-		JobConf conf = new JobConf(hbaseConfiguration);
-		conf.setNumMapTasks(filenum / tdnum);
-		conf.set("record", recordClassName);
-		conf.set("region", region);
-		conf.set("family", tabFamily);
-		conf.set("filterregion", filterregion);
-		conf.set("column", column);
-		conf.set("ischgport", ischgport);
-		conf.set("isbakinput", isbakinput);
-		conf.set("inputlarge", inputlarge);
-		conf.set("largesize", largesize);
-		conf.set("detailoutputdir", detailoutputdir);
-		conf.set("bakdir", bakdir);
-		conf.setLong("mapreduce.input.fileinputformat.split.maxsize", 150 * tdnum);
-		conf.setLong("mapreduce.input.fileinputformat.split.minsize", 1L);
-		conf.setLong("mapred.min.split.size", 1L);
-		conf.setInt("mapred.task.timeout", 3600000);
-		conf.setLong("mapred.tasktracker.map.tasks.maximum", maptasks);
+		} else {
+			long currFileSize = 0l;
+			for (begPos = 0; begPos < size; begPos++) {
+				currFileSize += fileInfos.get(begPos).getSize();
+				if (currFileSize >= avgfilesize) {
+					endPos = begPos + 1;
+					pool.execute(new CreatHDFSFile(fileSystem, input, fileInfos, begPos, endPos));
+					begPos = endPos;
+					currFileSize = 0l;
+				}
+			}
+			if (endPos != size) {
+				pool.execute(new CreatHDFSFile(fileSystem, input, fileInfos, begPos, size));
+			}
+		}
+		pool.shutdown();
+		while (!pool.awaitTermination(10, TimeUnit.SECONDS)) {
+		}
+	}
+
+	private void IndividuationJobConf(JobConf jobConf) {
+		jobConf.set("record", recordClassName);
+		jobConf.set("region", region);
+		jobConf.set("family", tabFamily);
+		jobConf.set("filterregion", filterregion);
+		jobConf.set("column", column);
+		jobConf.set("ischgport", ischgport);
+		jobConf.set("isbakinput", isbakinput);
+		jobConf.set("inputlarge", inputlarge);
+		jobConf.set("largesize", largesize);
+		jobConf.set("detailoutputdir", detailoutputdir);
+		jobConf.set("bakdir", bakdir);
+		jobConf.setLong("mapreduce.input.fileinputformat.split.maxsize", 150 * tdnum);
+		jobConf.setLong("mapreduce.input.fileinputformat.split.minsize", 1L);
+		jobConf.setLong("mapred.min.split.size", 1L);
+		jobConf.setInt("mapred.task.timeout", 3600000);
+		jobConf.setLong("mapred.tasktracker.map.tasks.maximum", maptasks);
 		// mapper失败重试次数，默认是4.在准生产上有机子挂掉,网络联通不了会导致部分失败，必须设置此参数，否则命中失败次数太多会导致整个Job失败。
-		conf.setInt("mapred.max.map.failures.percent", 20);
+		jobConf.setInt("mapred.max.map.failures.percent", 20);
+	}
 
-		Job job = Job.getInstance(conf);
-		job.setJobName("QJDBASE_JOB_" + fileNamePrefix + new SimpleDateFormat("yyyyMM").format(new Date()));
+	private void ConfigJob(Job job) throws IOException {
+		job.setJobName("PutHbaseJOB_" + recordClassName + new SimpleDateFormat("yyyyMM").format(new Date()));
 		job.setMapperClass(Map.class);
 		job.setOutputKeyClass(Text.class);
 		job.setOutputValueClass(Text.class);
 		job.setOutputFormatClass(NullOutputFormat.class);
 		job.setNumReduceTasks(0);
-		FileInputFormat.addInputPath(job, inputpath);
-		logger.info("config HbaseJOB...");
-
-		long sttime = System.currentTimeMillis();
 		job.setJarByClass(MainApp.class);
-		logger.info("excute Job begin..");
 		TableMapReduceUtil.addDependencyJars(job);
 		TableMapReduceUtil.initCredentials(job);
-
-		logger.info((job.waitForCompletion(true) ? "excute task successfully!" : "excute task fail!"));
-		logger.info("clean begin...");
-		fs.delete(inputpath, true);
-		long endtime = System.currentTimeMillis();
-		logger.info("file list:" + filenum + ",all task finish,total time:" + (endtime - sttime) / 1000 + "s,quit...");
-
 	}
 
-	private static void InputHDFS(int tdnum, String input, FileSystem fs, List<FileInfo> fileinfos, Long avgfilesize,
-			int itype) throws InterruptedException {
-		ExecutorService pool = Executors.newFixedThreadPool(50);
+	private static class CreatHDFSFile extends Thread {
+		private FileSystem fileSystem;
+		private Path path;
+		private List<FileInfo> fileinfos;
+		private int start;
+		private int end;
+		private FSDataOutputStream os;
 
-		if (itype == 1) { // 按文件大小分片
-			Long currentfilesize = 0l;// 当前文件总大小
-			int beginindex = 0;
-			int endindex = 0;
-			CreatHDFSFile td = null;
-			for (int i = beginindex, len = fileinfos.size(); i < len; i++) {
-				currentfilesize += fileinfos.get(i).getSize();
-				if (avgfilesize <= currentfilesize) {
-					endindex = i + 1;
-					td = new CreatHDFSFile(fs, input, fileinfos, beginindex, endindex);
-					beginindex = endindex;
-					currentfilesize = 0l;
-					pool.execute(td);
+		public CreatHDFSFile(FileSystem fileSystem, String path, List<FileInfo> fileinfos, int start, int end) {
+			try {
+				sleep(1);// 睡1毫秒避免重名
+				this.fileSystem = fileSystem;
+				this.path = new Path(path + "/" + String.valueOf(new Date().getTime()));
+				this.fileinfos = fileinfos;
+				this.os = this.fileSystem.create(this.path, true, 1024);
+				this.start = start;
+				this.end = end;
+			} catch (Exception e) {
+				logger.info("", e);
+			}
+		}
+
+		@Override
+		public void run() {
+			try {
+				for (int i = this.start; i < this.end; i++) {
+					Text tx = new Text(this.fileinfos.get(i).getFileinfo());
+					os.write(tx.getBytes(), 0, tx.getLength());
+					os.write(Bytes.toBytes("\n"));
 				}
-			}
-			if (endindex != fileinfos.size()) {
-				td = new CreatHDFSFile(fs, input, fileinfos, beginindex, fileinfos.size());
-				pool.execute(td);
-			}
-		} else { // 按文件数量分片
-			if (fileinfos.size() - tdnum < 0) {
-				CreatHDFSFile td = new CreatHDFSFile(fs, input, fileinfos, 0, fileinfos.size());
-				pool.execute(td);
-			} else {
-				for (int i = 0; i < fileinfos.size(); i += tdnum) {
-					CreatHDFSFile td;
-					if (i + tdnum <= fileinfos.size()) {
-						td = new CreatHDFSFile(fs, input, fileinfos, i, i + tdnum);
-					} else {
-						td = new CreatHDFSFile(fs, input, fileinfos, i, fileinfos.size());
-					}
-					pool.execute(td);
+				os.flush();
+			} catch (IOException e) {
+				logger.info("", e);
+			} finally {
+				try {
+					os.close();
+				} catch (IOException e) {
+					logger.info("", e);
 				}
 			}
 		}
-		pool.shutdown();
-		while (!pool.awaitTermination(10, TimeUnit.SECONDS))
-			;
-	}
 
-	public static class Map extends Mapper<LongWritable, Text, Text, IntWritable> {
-		static final Log LOG = LogFactory.getLog(Map.class);
+	}
+	
+	
+	private static class Map extends Mapper<LongWritable, Text, Text, IntWritable> {
+		protected static final Logger logger = LoggerFactory.getLogger(Map.class);
 		private static final String CHARTSET = "GBK";
 		private static String recordClassName;
 		private static Record record;
@@ -202,7 +233,7 @@ public class MRHander extends BaseHandler {
 
 		@Override
 		protected void setup(Context context) throws IOException, InterruptedException {
-			LOG.info("init");
+			logger.info("init");
 			recordClassName = context.getConfiguration().get("record");
 			regions = context.getConfiguration().get("region").split(",");
 			family = context.getConfiguration().get("family").split(",");
@@ -231,7 +262,7 @@ public class MRHander extends BaseHandler {
 
 			} catch (Exception e) {
 				e.printStackTrace();
-				LOG.error("loadclsError!", e);
+				logger.error("loadclsError!", e);
 			}
 			System.out.println("set conf secusse!");
 		}
@@ -239,7 +270,7 @@ public class MRHander extends BaseHandler {
 		@Override
 		protected void cleanup(Context context) throws IOException, InterruptedException {
 			Iterator<Entry<String, FtpTools>> it = FtpTools.ftpClientList.entrySet().iterator();
-			LOG.info("cleanup:" + FtpTools.ftpClientList.size());
+			logger.info("cleanup:" + FtpTools.ftpClientList.size());
 			FtpTools ftptools = null;
 			while (it.hasNext()) {
 				try {
@@ -247,7 +278,7 @@ public class MRHander extends BaseHandler {
 					if (ftptools.getFtpClient().changeWorkingDirectory(detailoutputdir)) {
 						FTPFile[] files = ftptools.getFtpClient().listFiles(detail_fileName);
 						if (files.length >= 1) {
-							LOG.info("rename detailfile:"
+							logger.info("rename detailfile:"
 									+ detail_fileName
 									+ ",result:"
 									+ ftptools.rename(detail_fileName,
@@ -255,7 +286,7 @@ public class MRHander extends BaseHandler {
 						}
 
 					}
-					LOG.info("ftptools:" + ftptools.toString());
+					logger.info("ftptools:" + ftptools.toString());
 					if (ftptools.isConned()) {
 						ftptools.disConnect();
 					}
@@ -280,7 +311,7 @@ public class MRHander extends BaseHandler {
 
 		@Override
 		protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
-			LOG.info("contents is:" + value.toString());
+			logger.info("contents is:" + value.toString());
 			String[] ftpinfo = value.toString().split(":");
 
 			int port = 21;
@@ -292,55 +323,55 @@ public class MRHander extends BaseHandler {
 			int inputlinenum = 0;// 实际入库行数
 			try {
 				if (ftp.connectServer()) {
-					LOG.info("connect success!" + " port:" + port);
+					logger.info("connect success!" + " port:" + port);
 					ByteArrayInputStream bin = null;
 					FSDataInputStream inStream = null;
 					BufferedReader br = null;
 					// 获取原文件的行数
-					if (largesize < Long.valueOf(ftpinfo[6])) {
-						FileSystem fs = FileSystem.get(context.getConfiguration());
+					if (largesize < Long.valueOf(ftpinfo[6])) { // 大文件特殊处理
+						FileSystem fileSystem = FileSystem.get(context.getConfiguration());
 						Path datapath = new Path(inputlargepath + "/" + ftpinfo[5]);
-						FSDataOutputStream out = fs.create(datapath);
+						FSDataOutputStream out = fileSystem.create(datapath);
 						ftp.download(ftpinfo[5], out);
 						out.close();
-						inStream = fs.open(datapath);
+						inStream = fileSystem.open(datapath);
 						br = new BufferedReader(new InputStreamReader(inStream, CHARTSET));
 					} else {
 						byte[] bos = ftp.download2Buf(ftpinfo[5]);
-						LOG.info("download2Buf finish!");
+						logger.info("download2Buf finish!");
 						if (bos.length == 0) {
-							LOG.info(ftpinfo[5] + "file is empty");
+							logger.info(ftpinfo[5] + "file is empty");
 							return;
 						}
 						if (ftpinfo[5].toLowerCase().endsWith(".z")) {// 解压
-							LOG.info("ftp:deCompress");
+							logger.info("ftp:deCompress");
 							bos = LCompress.deCompress(bos);
-							LOG.info("ftp:deCompress finish");
+							logger.info("ftp:deCompress finish");
 						}
 						bin = new ByteArrayInputStream(bos);
 						br = new BufferedReader(new InputStreamReader(bin, CHARTSET));
 					}
 
 					long starttime = System.currentTimeMillis();
-					LOG.info("start DealFile:" + ftpinfo[5]);
+					logger.info("start DealFile:" + ftpinfo[5]);
 					// 业务处理
 					linenum = record.buildRecord(ftpinfo[5], br, connection);
 					long endtime = System.currentTimeMillis();
-					LOG.info("insert Hbase Finish!recodeCount:" + linenum + ",Time Consuming:" + (endtime - starttime)
-							+ "ms.");
-					LOG.info(ftpinfo[5] + ":process" + linenum);
+					logger.info("insert Hbase Finish!recodeCount:" + linenum + ",Time Consuming:"
+							+ (endtime - starttime) + "ms.");
+					logger.info(ftpinfo[5] + ":process" + linenum);
 					recursiondelfile(context, ftp, ftpinfo, 3, linenum, inputlinenum);
 				} else {
-					LOG.info("ftp error!");
+					logger.info("ftp error!");
 				}
 			} catch (SocketException e) {
-				LOG.error("map SocketException:" + e.getMessage());
+				logger.error("map SocketException:" + e.getMessage());
 				e.printStackTrace();
 			} catch (UnsupportedEncodingException e) {
-				LOG.error("map UnsupportedEncodingException:" + e.getMessage());
+				logger.error("map UnsupportedEncodingException:" + e.getMessage());
 				e.printStackTrace();
 			} catch (IOException e) {
-				LOG.error("map IOException:" + e.getMessage());
+				logger.error("map IOException:" + e.getMessage());
 				ExceptionController(value, e);
 			} catch (Exception e) {
 				ExceptionController(value, e);
@@ -349,7 +380,7 @@ public class MRHander extends BaseHandler {
 		}
 
 		public void ExceptionController(Text value, Exception e) throws InterruptedException {
-			LOG.error("connect ftp:" + value.toString() + ",error!");
+			logger.error("connect ftp:" + value.toString() + ",error!");
 			e.printStackTrace();
 			StringBuffer sb = new StringBuffer();
 			StackTraceElement[] stackArray = e.getStackTrace();
@@ -389,7 +420,7 @@ public class MRHander extends BaseHandler {
 		private void recursiondelfile(Context context, FtpTools ftp, String[] ftpinfo, int times, int linenum,
 				int inputlinenum) {
 			if (times <= 0) {
-				LOG.error("recursiondelfile fail filename:" + ftpinfo[5]);
+				logger.error("recursiondelfile fail filename:" + ftpinfo[5]);
 			} else {
 				try {
 					if (ftp.connectServer()) {
@@ -397,17 +428,17 @@ public class MRHander extends BaseHandler {
 							detailbak(context, ftpinfo, ftp, linenum, inputlinenum);
 						}
 						if ("0".equals(isbakinput)) {
-							LOG.info("delete file:" + ftpinfo[5] + "," + ftp.delete(ftpinfo[5]));
+							logger.info("delete file:" + ftpinfo[5] + "," + ftp.delete(ftpinfo[5]));
 						} else {
 							String tofiledir = getTofilename(ftpinfo[4], bakdir);
 							ftp.rename(ftpinfo[4] + "/" + ftpinfo[5], tofiledir + "/" + ftpinfo[5]);
 						}
 					} else {
-						LOG.warn("ftp login fail!");
+						logger.warn("ftp login fail!");
 					}
 				} catch (IOException e) {
 					times = times - 1;
-					LOG.warn("recursiondelfile IOException:" + e.getMessage());
+					logger.warn("recursiondelfile IOException:" + e.getMessage());
 					e.printStackTrace();
 					recursiondelfile(context, ftp, ftpinfo, times, linenum, inputlinenum);
 				}
@@ -432,43 +463,4 @@ public class MRHander extends BaseHandler {
 		}
 	}
 
-	public static class CreatHDFSFile extends Thread {
-		private FileSystem fs;
-		private Path path;
-		private List<FileInfo> fileinfos;
-		private int start;
-		private int end;
-		private FSDataOutputStream os;
-
-		public CreatHDFSFile(FileSystem fs, String path, List<FileInfo> fileinfos, int start, int end) {
-			try {
-				sleep(1);// 睡1毫秒避免重名
-				this.fs = fs;
-				this.path = new Path(path + "/" + String.valueOf(new Date().getTime()));
-				// System.out.println("写入文件:"+this.path.toString());
-				this.fileinfos = fileinfos;
-				this.os = this.fs.create(this.path, true, 1024);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-			this.start = start;
-			this.end = end;
-		}
-
-		@Override
-		public void run() {
-			try {
-				for (int i = this.start; i < this.end; i++) {
-					Text tx = new Text(this.fileinfos.get(i).getFileinfo());
-					os.write(tx.getBytes(), 0, tx.getLength());
-					os.write(Bytes.toBytes("\n"));
-				}
-				os.flush();
-				os.close();
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-
-	}
 }

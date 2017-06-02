@@ -4,16 +4,16 @@ import java.io.BufferedReader;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class GroupBillRecord extends Record {
-	public static final Log LOG = LogFactory.getLog(GroupBillRecord.class);
+	protected static final Logger logger = LoggerFactory.getLogger(GroupBillRecord.class);
 	public static final String START = "START|"; // 账单起始位置
 	public static final String END = "END"; // 账单结束位置
 
@@ -67,11 +67,11 @@ public class GroupBillRecord extends Record {
 		String head = "";
 		Table table = null;
 
-		getFileType(filename); 
-		
+		getFileType(filename);
+
 		String tableName = tablePrefix + filename.split("_")[1].substring(5, 11);
 		System.out.println("currTableName:" + tableName);
-		
+
 		table = mapTable.get(tableName);
 		if (table == null) {
 			if (getRegions().length > 1 || !"".equals(getRegions()[0])) {
@@ -88,8 +88,8 @@ public class GroupBillRecord extends Record {
 			((HTable) table).setAutoFlushTo(false);
 			((HTable) table).flushCommits();
 			mapTable.put(tableName, table);
-		} 
-		
+		}
+
 		while (((line = br.readLine()) != null)) {
 			if (line.startsWith(START)) {
 				head = line.substring(START.length(), line.length()); // START|
@@ -129,10 +129,10 @@ public class GroupBillRecord extends Record {
 			// 账单尾部;入库操作
 			if (line.equals(END)) {
 				billcount++;
-				// 设置列值
-				setValues(new String[] { head, _area, body.toString() });
+
 				// 入库
-				addColumn(table, getHBaseRowKey(), getFamilyNames()[0], getColumns(), getValues(), "GBK");
+				addColumn(table, getHBaseRowKey(), getFamilyNames()[0], getColumns(),
+						new String[] { head, _area, body.toString() }, "GBK");
 
 			}
 		}

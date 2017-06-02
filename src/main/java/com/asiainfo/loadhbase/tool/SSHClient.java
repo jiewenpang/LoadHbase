@@ -33,7 +33,7 @@ public class SSHClient {
 
 	public List<String> getFileList(String cmd) {
 		List<String> flist = null;
-		
+
 		try {
 			if (null == conn) {
 				throw new ConnectException();
@@ -42,7 +42,7 @@ public class SSHClient {
 			Session sess = conn.openSession();
 
 			sess.execCommand(cmd);
-			
+
 			InputStream stdout = new StreamGobbler(sess.getStdout());
 
 			BufferedReader br = new BufferedReader(new InputStreamReader(stdout));

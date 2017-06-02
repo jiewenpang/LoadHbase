@@ -26,10 +26,8 @@ public abstract class Record {
 	protected static final Logger logger = LoggerFactory.getLogger(Record.class);
 	protected String tablePrefix;
 	protected String[] regions;
-	protected String rowKey;
-	protected String[] familyNames; // Сазх
+	protected String[] familyNames;
 	protected String[] columns;
-	protected String[] values;
 	protected String filterRegion;
 	public Map<String, Table> mapTable = new HashMap<String, Table>();
 
@@ -43,14 +41,6 @@ public abstract class Record {
 
 	public void setRegions(String[] regions) {
 		this.regions = regions;
-	}
-
-	public String getRowKey() {
-		return rowKey;
-	}
-
-	public void setRowKey(String rowKey) {
-		this.rowKey = rowKey;
 	}
 
 	public String[] getFamilyNames() {
@@ -67,14 +57,6 @@ public abstract class Record {
 
 	public void setColumns(String[] columns) {
 		this.columns = columns;
-	}
-
-	public String[] getValues() {
-		return values;
-	}
-
-	public void setValues(String[] values) {
-		this.values = values;
 	}
 
 	public String getFilterRegion() {

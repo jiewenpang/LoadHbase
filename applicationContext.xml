@@ -26,55 +26,55 @@
 				<entry key="keytab" value="/home/bd_qzdzx/user.keytab" />
 				<entry key="jaasconf" value="/opt/client/HDFS/hadoop/etc/hadoop/jaas.conf" />
 				<entry key="principal" value="bd_qzdzx@HADOOP.COM" />
-				<!-- 
-				开发集群：jdbc:hive2://172.16.1.228:10000/default
-				联调集群：jdbc:hive2://172.32.0.3:24002,172.32.0.2:24002,172.32.0.1:24002/;serviceDiscoveryMode=zooKeeper;zooKeeperNamespace=hiveserver2;sasl.qop=auth-conf;auth=KERBEROS;principal=hive/hadoop.hadoop.com@HADOOP.COM
-				生产集群：jdbc:hive2://192.252.102.89:24002,192.252.102.90:24002,192.252.102.139:24002/;serviceDiscoveryMode=zooKeeper;zooKeeperNamespace=hiveserver2_2;sasl.qop=auth-conf;auth=KERBEROS;principal=hive2/hadoop.hadoop.com@HADOOP.COM
-				-->
-				<entry key="connString" value="jdbc:hive2://172.16.1.228:10000/default" />
-				<entry key="class" value="org.apache.hive.jdbc.HiveDriver" />
 			</util:map>
 		</property>
 	</bean>
 
 	<bean id="mrHander" class="com.asiainfo.loadhbase.handler.MRHander" >
-		<property name="name"  value="mrHander" />
-		<property name="ftpInfo"  value="172.16.0.138:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk1/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk4/BOSS/bak" />
-		<property name="listFileCmd"  value="ls |head -100000" />
-		<property name="RemoteType"  value="1" />   <!-- 1为用ftp方式获取文件列表，2为用ssh方式获取文件列表 -->
-		<property name="ischgport"  value="false" />  <!-- ftp获取文件是否统一为端口号21，否则使用ftpInfo的端口获取 -->
-		<property name="icfgport"  value="22" />  <!-- ssh连接获取文件列表时使用的端口号 -->
-		<property name="recordClassName"  value="com.asiainfo.loadhbase.resource.BOSSRecord" />
-		<property name="region"  value="100860031,10630038,106350096138" />
-		<property name="tabFamily"  value="Info" />
-		<property name="maptotalnum"  value="600" />  <!-- 单机最多的map数 -->
-		<property name="column"  value="Header,Area,Body" />  <!-- EventFormatType,Area,Cdr -->
-		<property name="filterregion"  value="06,09" />
-		<property name="tdnum"  value="50" />  <!-- 每tdnum个文件起一个map -->
-		<property name="isbakinput"  value="0" />  <!-- 0表示不备份 -->
-		<property name="input"  value="/GMCCDATALOAD_INPUT" />
+		<property name="name"		value="mrHander" />
+		<property name="ftpInfo"	value="172.16.0.138:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk1/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk4/BOSS/bak" />
+		<property name="listFileCmd"	value="ls |head -100000" />		<!-- 罗列远端文件列表的命令 -->
+		<property name="remoteType"	value="1" />						<!-- 1为用ftp方式获取文件列表，2为用ssh方式获取文件列表 -->
+		<property name="ischgport"	value="false" />					<!-- ftp获取文件是否统一为端口号21，否则使用ftpInfo的端口获取 -->
+		<property name="icfgport"	value="22" />						<!-- ssh连接获取文件列表时使用的端口号 -->
+		<property name="maptotalnum"	value="600" />					<!-- 之后定集群最大的任务数 -->
+		<property name="recordClassName" >								<!-- 指定处理的文件类 -->
+			<ref bean="bossRecord" />
+		</property>
+		
+		<property name="tdnum"		value="50" />						<!-- 每tdnum个文件起一个map -->
+		<property name="input"		value="/GMCCDATALOAD_INPUT" />		<!-- 中间文件存放地 -->
+		<property name="inputlarge"	value="1073741824" />  				<!-- 中间文件存放地 -->
+		<property name="isbakinput"	value="0" />						<!-- 0表示不备份 -->
+		<property name="isShardByFileNum"	value="true" />				<!-- true为按文件数量分片，false为按文件大小 -->
+		<property name="bakdir"		value="/GMCCDATALOAD_BAK" />		<!-- 0表示不备份 -->
+		<property name="largesize" 	value="1073741824" />				<!-- 超过此数量的文件放入hdfs解压处理 -->
+		<property name="maptasks"	value="32" />						<!-- 单机最多的map数 -->
+		<property name="detailoutputdir"	value="/detailoutputdir" />	<!-- -1表示无需出明细文件-->
+		<property name="detailoutputdir"	value="/detailoutputdir" />	<!-- -1表示无需出明细文件-->
 	</bean>
 	
 	<bean id="noMRHander" class="com.asiainfo.loadhbase.handler.NoMRHander" >
 		<property name="name"  value="noMRHander" />
-		<property name="ftp"  value="172.16.0.138:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk1/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk4/BOSS/bak" />
-		<property name="cmd"  value="ls |head -100000" />
-		<property name="type"  value="1" /> 
-		<property name="ischgport"  value="0" />
-		<property name="icfgport"  value="22" />
-		<property name="recordClassName"  value="com.asiainfo.loadhbase.resource.BOSSRecord" />
-		<property name="tableNamePrefix"  value="BOSS_" />
-		<property name="region"  value="100860031,10630038,106350096138" />
-		<property name="tabFamily"  value="Info" />
-		<property name="maptotalnum"  value="600" />
-		<property name="column"  value="Header,Area,Body" /><!-- EventFormatType,Area,Cdr -->
-		<property name="filterregion"  value="06,09" />
+		<property name="ftpInfo"	value="172.16.0.138:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk1/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk4/BOSS/bak" />
+		<property name="listFileCmd"	value="ls |head -100000" />		<!-- 罗列远端文件列表的命令 -->
+		<property name="remoteType"	value="1" />						<!-- 1为用ftp方式获取文件列表，2为用ssh方式获取文件列表 -->
+		<property name="ischgport"	value="false" />					<!-- ftp获取文件是否统一为端口号21，否则使用ftpInfo的端口获取 -->
+		<property name="icfgport"	value="22" />						<!-- ssh连接获取文件列表时使用的端口号 -->
+		<property name="maptotalnum"	value="600" />					<!-- 之后定集群最大的任务数 -->
+		<property name="recordClassName" >								<!-- 指定处理的文件类 -->
+			<ref bean="bossRecord" />
+		</property>
 	</bean>
 	
 	<bean id="bossRecord" class="com.asiainfo.loadhbase.resource.BOSSRecord" >
 		<property name="name"  value="bossRecord" />
+		<property name="fileNamePrefix"  value="mrHander" />
+		<property name="region"  value="100860031,10630038,106350096138" />
+		<property name="tabFamily"  value="Info" />
 		<property name="tableNamePrefix"  value="BOSS_" />
+		<property name="column"  value="Header,Area,Body" />  <!-- EventFormatType,Area,Cdr -->
+		<property name="filterregion"  value="06,09" />
 	</bean>
-	
 	
 </beans>

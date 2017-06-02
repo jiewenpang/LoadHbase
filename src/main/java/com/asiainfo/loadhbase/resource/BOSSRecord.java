@@ -4,8 +4,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.MasterNotRunningException;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.ZooKeeperConnectionException;
@@ -13,9 +11,11 @@ import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class BOSSRecord extends Record {
-	static final Log LOG = LogFactory.getLog(BOSSRecord.class);
+	protected static final Logger logger = LoggerFactory.getLogger(BOSSRecord.class);
 
 	@Override
 	public boolean checkFileName(String name) {
@@ -33,7 +33,7 @@ public class BOSSRecord extends Record {
 		StringBuilder sb = null;
 		Table table = null;
 		String tableName = null;
-		
+
 		try {
 			while ((line = br.readLine()) != null) {
 				sb = new StringBuilder(line);
@@ -42,7 +42,7 @@ public class BOSSRecord extends Record {
 				if (linenum == 1) {
 					tableName = tablePrefix + sb.substring(139, 145);
 					System.out.println("currTableName:" + tableName);
-					
+
 					table = mapTable.get(tableName);
 					if (table == null) {
 						if (getRegions().length > 1 || !"".equals(getRegions()[0])) {
@@ -59,11 +59,11 @@ public class BOSSRecord extends Record {
 						((HTable) table).setAutoFlushTo(false);
 						((HTable) table).flushCommits();
 						mapTable.put(tableName, table);
-					} 
-					
+					}
+
 					continue;
 				}
-				
+
 				String telnum = null;
 				String time = null;
 				String area = null;
@@ -88,34 +88,31 @@ public class BOSSRecord extends Record {
 
 				// 过滤部分地市
 				if (linenum == 2 && filterRegion.contains(area)) {
-					LOG.info("region:" + area);
+					logger.info("region:" + area);
 					break;
 				}
-				
+
 				// 设置行键
 				StringBuilder hsb = new StringBuilder();
 				hsb.append(telnum).append("|").append(time).append("|").append(filename).append("|").append(linenum);
 
-				// 设置列值
-				setValues(new String[] { line });
-				
 				// 入库
-				addColumn(table, hsb.toString(), getFamilyNames()[0], getColumns(), getValues(), null);
+				addColumn(table, hsb.toString(), getFamilyNames()[0], getColumns(), new String[] { line }, null);
 
 			}
-			
+
 			((HTable) table).flushCommits();
-			LOG.info("end buildRecord");
+			logger.info("end buildRecord");
 		} catch (MasterNotRunningException e) {
-			LOG.error("MasterNotRunningException:" + e.getMessage());
+			logger.error("MasterNotRunningException:" + e.getMessage());
 			throw new InterruptedException();
 		} catch (ZooKeeperConnectionException e) {
-			LOG.error("ZooKeeperConnectionException:" + e.getMessage());
+			logger.error("ZooKeeperConnectionException:" + e.getMessage());
 			throw new InterruptedException();
 		} catch (UnsupportedEncodingException e) {
-			LOG.error("UnsupportedEncodingException:" + e.getMessage());
+			logger.error("UnsupportedEncodingException:" + e.getMessage());
 		} catch (IOException e) {
-			LOG.error("IOException:" + e.getMessage());
+			logger.error("IOException:" + e.getMessage());
 		} finally {
 			if (null != br) {
 				try {
