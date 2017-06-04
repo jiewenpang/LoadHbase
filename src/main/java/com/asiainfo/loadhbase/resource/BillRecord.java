@@ -15,26 +15,21 @@ import org.slf4j.LoggerFactory;
 
 public class BillRecord extends Record {
 	protected static final Logger logger = LoggerFactory.getLogger(BillRecord.class);
-	public static final String START = "START|";
-	public static final String END = "END";
-
-	public static int ACCNO_INDEX = 0;
-	public static int USERID_INDEX = 1;
-	public static int MOBNO_INDEX = 2;
-	public static int DATE_INDEX = 4;
-	public static int VERSION_INDEX = -5;
-	public static int TYPE_INDEX = -4;
-	public static int OLD_BILL_LENGTH = 20;
-
-	public static final char DELIMITER = '|';
-	public static final char BODY_ITEM_DELIMITER = '^';
+	
+	private static final String START = "START|";
+	private static final String END = "END";
+	private static final int ACCNO_INDEX = 0;
+	private static final int MOBNO_INDEX = 2;
+	private static final int DATE_INDEX = 4;
+	private static final int VERSION_INDEX = -5;
+	private static final int TYPE_INDEX = -4;
+	private static final char DELIMITER = '|';
+	private static final char BODY_ITEM_DELIMITER = '^';
 
 	private boolean _isGroupBill = false;
 	private boolean _isOldBill = false;
-
 	private String _mobNo;
 	private String _accNo;
-	private String _userId;
 	private String _yearMonth;
 	private String _version;
 	private String _type;
@@ -76,9 +71,9 @@ public class BillRecord extends Record {
 				for (int j = 0; j < getRegions().length; j++) {
 					regs[j] = Bytes.toBytes(getRegions()[j]);
 				}
-				creatTable(tableName, getFamilyNames(), regs, connection);
+				creatTable(tableName, getFamilys(), regs, connection);
 			} else {
-				creatTable(tableName, getFamilyNames(), null, connection);
+				creatTable(tableName, getFamilys(), null, connection);
 			}
 
 			table = connection.getTable(TableName.valueOf(tableName));
@@ -102,7 +97,7 @@ public class BillRecord extends Record {
 
 			// 账单体解析
 			if ((!line.matches(".*\\|.*\\|.*") || line.split("\\|", -1).length != 3) && !line.startsWith(END)) {
-				System.out.println("error mobile:" + get_mobNo() + "error context:" + line);
+				System.out.println("error mobile:" + _mobNo + "error context:" + line);
 				bflag = true;
 			}
 
@@ -110,22 +105,17 @@ public class BillRecord extends Record {
 				continue; // 不再拼接账单体
 			} else {
 				String reDelimitedLine = line.replace(DELIMITER, BODY_ITEM_DELIMITER);
-				if (!line.startsWith(END))
+				if (!line.startsWith(END)) {
 					body.append(reDelimitedLine).append("|");
+				}
 			}
 
 			// 账单尾部;入库操作
 			if (line.equals(END)) {
 				billcount++;
 
-				/*
-				 * //设置列名 if(getColumns() == null || getColumns().length<=0) {
-				 * setColumns(new String[]{"Header","Area","Body"}); }
-				 */
-
 				// 入库
-				addColumn(table, getHBaseRowKey(), getFamilyNames()[0], getColumns(),
-						new String[] { head, _area, body.toString() }, "GBK");
+				addColumn(table, getHBaseRowKey(), getFamilys()[0], getColumns(), new String[] { head, _area, body.toString() }, "GBK");
 
 			}
 		}
@@ -134,47 +124,27 @@ public class BillRecord extends Record {
 		return billcount;
 	}
 
-	/**
-	 * 获取rowkey
-	 * 
-	 * @return
-	 */
 	public String getHBaseRowKey() {
 		StringBuilder sb = new StringBuilder();
 		if (this._isGroupBill) {
-			sb.append(get_accNo());
-			sb.append('|');
-			sb.append(get_mobNo());
+			sb.append(_accNo).append('|').append(_mobNo);
 		} else {
-			sb.append(get_mobNo());
-			sb.append('|');
-			sb.append(get_accNo());
-			sb.append('|');
-			sb.append(get_yearMonth());
-			sb.append('|');
-			sb.append(get_area());
-			sb.append('|');
+			sb.append(_mobNo).append('|').append(_accNo).append('|').append(_yearMonth).append('|').append(_area).append('|');
 			if (this._isOldBill) {
 				sb.append('|');
 			} else {
-				sb.append(get_version());
+				sb.append(_version);
 				sb.append('|');
-				sb.append(get_type());
+				sb.append(_type);
 			}
 		}
 		return sb.toString();
 	}
 
-	/**
-	 * 从账单头获取相关讯息
-	 * 
-	 * @param header
-	 */
 	private void parseHeader(String header) {
 		List<String> split = split(header, '|');
 
 		this._accNo = promisedGet(split, ACCNO_INDEX);
-		this._userId = promisedGet(split, USERID_INDEX);
 		this._mobNo = promisedGet(split, MOBNO_INDEX);
 		this._yearMonth = promisedGet(split, DATE_INDEX);
 		if (this._isOldBill) {
@@ -186,15 +156,6 @@ public class BillRecord extends Record {
 		}
 	}
 
-	/**
-	 * 获取集合中元素
-	 * 
-	 * @param split
-	 *            源数据
-	 * @param index
-	 *            索引位置
-	 * @return
-	 */
 	private String promisedGet(List<String> split, int index) {
 		if (index >= split.size()) {
 			return "";
@@ -205,12 +166,6 @@ public class BillRecord extends Record {
 		return (String) split.get(index);
 	}
 
-	/**
-	 * 根据文件名获取文件类型
-	 * 
-	 * @param fileName
-	 * @throws IOException
-	 */
 	public void getFileType(String fileName) throws IOException {
 		if (fileName.startsWith("JT")) {
 			this._isGroupBill = true;
@@ -238,62 +193,6 @@ public class BillRecord extends Record {
 			start = end + 1;
 		}
 		return ret;
-	}
-
-	public String get_mobNo() {
-		return _mobNo;
-	}
-
-	public void set_mobNo(String _mobNo) {
-		this._mobNo = _mobNo;
-	}
-
-	public String get_accNo() {
-		return _accNo;
-	}
-
-	public void set_accNo(String _accNo) {
-		this._accNo = _accNo;
-	}
-
-	public String get_userId() {
-		return _userId;
-	}
-
-	public void set_userId(String _userId) {
-		this._userId = _userId;
-	}
-
-	public String get_yearMonth() {
-		return _yearMonth;
-	}
-
-	public void set_yearMonth(String _yearMonth) {
-		this._yearMonth = _yearMonth;
-	}
-
-	public String get_version() {
-		return _version;
-	}
-
-	public void set_version(String _version) {
-		this._version = _version;
-	}
-
-	public String get_type() {
-		return _type;
-	}
-
-	public void set_type(String _type) {
-		this._type = _type;
-	}
-
-	public String get_area() {
-		return _area;
-	}
-
-	public void set_area(String _area) {
-		this._area = _area;
 	}
 
 }

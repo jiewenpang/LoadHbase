@@ -11,12 +11,8 @@ import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class BOSSRecord extends Record {
-	protected static final Logger logger = LoggerFactory.getLogger(BOSSRecord.class);
-
 	@Override
 	public boolean checkFileName(String name) {
 		boolean flag = false;
@@ -50,9 +46,9 @@ public class BOSSRecord extends Record {
 							for (int j = 0; j < getRegions().length; j++) {
 								regs[j] = Bytes.toBytes(getRegions()[j]);
 							}
-							creatTable(tableName, getFamilyNames(), regs, connection);
+							creatTable(tableName, getFamilys(), regs, connection);
 						} else {
-							creatTable(tableName, getFamilyNames(), null, connection);
+							creatTable(tableName, getFamilys(), null, connection);
 						}
 
 						table = connection.getTable(TableName.valueOf(tableName));
@@ -97,7 +93,7 @@ public class BOSSRecord extends Record {
 				hsb.append(telnum).append("|").append(time).append("|").append(filename).append("|").append(linenum);
 
 				// Èë¿â
-				addColumn(table, hsb.toString(), getFamilyNames()[0], getColumns(), new String[] { line }, null);
+				addColumn(table, hsb.toString(), getFamilys()[0], getColumns(), new String[] { line }, null);
 
 			}
 
@@ -125,4 +121,5 @@ public class BOSSRecord extends Record {
 
 		return linenum - 1;
 	}
+
 }

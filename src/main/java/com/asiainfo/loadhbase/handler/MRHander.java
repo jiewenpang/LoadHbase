@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.io.DefaultStringifier;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -47,16 +48,15 @@ import com.asiainfo.loadhbase.tool.FtpTools;
 import com.asiainfo.loadhbase.tool.LCompress;
 
 public class MRHander extends BaseHandler {
-
-	protected int tdnum;
-	protected String input;
-	protected String inputlarge;
-	protected String isbakinput;
 	protected boolean isShardByFileNum;
-	protected String bakdir;
-	protected String largesize;
-	protected int maptasks;
-	protected String detailoutputdir;
+	protected int maxMapInJob;
+	protected int maxTaskPerNode;
+	protected int filesPerTask;
+	protected String inputHdfsPath;
+	protected String maxFileSize;
+	protected String maxFileHandlePath;
+	protected String inputBakPath;
+	protected String detailOutputPath;
 
 	@Override
 	public void run() throws Exception {
@@ -73,14 +73,14 @@ public class MRHander extends BaseHandler {
 		logger.info("Get fileInfoList success, fileNum:" + fileNum);
 
 		// 输入文件信息分批存放到hdfs的中间文件列表，每个文件对应一个map任务
-		Path inputpath = new Path(input);
-		FileInfoToHDFS(inputpath, fileInfoList, totalSize / maptotalnum, isShardByFileNum);
+		Path inputpath = new Path(inputHdfsPath);
+		FileInfoToHDFS(inputpath, fileInfoList, totalSize / maxMapInJob, isShardByFileNum);
 		logger.info("Put fileInfoList to hdfs success");
 
 		// 作业集群参数配置
 		JobConf jobConf = new JobConf(hbaseConfiguration);
 		IndividuationJobConf(jobConf);
-		jobConf.setNumMapTasks(fileNum / tdnum);
+		jobConf.setNumMapTasks(fileNum / filesPerTask);
 
 		Job job = Job.getInstance(jobConf);
 		ConfigJob(job);
@@ -107,12 +107,12 @@ public class MRHander extends BaseHandler {
 		int begPos = 0, endPos = 0, size = fileInfos.size();
 		ExecutorService pool = Executors.newFixedThreadPool(50);
 		if (isShardByFileNum) {
-			for (begPos = 0; begPos < size; begPos += tdnum) {
-				endPos = begPos + tdnum;
-				if (begPos + tdnum > size) {
+			for (begPos = 0; begPos < size; begPos += filesPerTask) {
+				endPos = begPos + filesPerTask;
+				if (begPos + filesPerTask > size) {
 					endPos = size;
 				}
-				pool.execute(new CreatHDFSFile(fileSystem, input, fileInfos, begPos, endPos));
+				pool.execute(new CreatHDFSFile(fileSystem, inputHdfsPath, fileInfos, begPos, endPos));
 			}
 
 		} else {
@@ -121,13 +121,13 @@ public class MRHander extends BaseHandler {
 				currFileSize += fileInfos.get(begPos).getSize();
 				if (currFileSize >= avgfilesize) {
 					endPos = begPos + 1;
-					pool.execute(new CreatHDFSFile(fileSystem, input, fileInfos, begPos, endPos));
+					pool.execute(new CreatHDFSFile(fileSystem, inputHdfsPath, fileInfos, begPos, endPos));
 					begPos = endPos;
 					currFileSize = 0l;
 				}
 			}
 			if (endPos != size) {
-				pool.execute(new CreatHDFSFile(fileSystem, input, fileInfos, begPos, size));
+				pool.execute(new CreatHDFSFile(fileSystem, inputHdfsPath, fileInfos, begPos, size));
 			}
 		}
 		pool.shutdown();
@@ -136,28 +136,30 @@ public class MRHander extends BaseHandler {
 	}
 
 	private void IndividuationJobConf(JobConf jobConf) {
-		jobConf.set("record", recordClassName);
-		jobConf.set("region", region);
-		jobConf.set("family", tabFamily);
-		jobConf.set("filterregion", filterregion);
-		jobConf.set("column", column);
-		jobConf.set("ischgport", ischgport);
-		jobConf.set("isbakinput", isbakinput);
-		jobConf.set("inputlarge", inputlarge);
-		jobConf.set("largesize", largesize);
-		jobConf.set("detailoutputdir", detailoutputdir);
-		jobConf.set("bakdir", bakdir);
-		jobConf.setLong("mapreduce.input.fileinputformat.split.maxsize", 150 * tdnum);
-		jobConf.setLong("mapreduce.input.fileinputformat.split.minsize", 1L);
+		jobConf.set("isUseDefaultPort", isUseDefaultPort.toString());
+
+		jobConf.setLong("mapred.tasktracker.map.tasks.maximum", maxTaskPerNode);
+		jobConf.setLong("mapreduce.input.fileinputformat.split.maxsize", 150 * filesPerTask);
+		jobConf.set("maxFileSize", maxFileSize);
+		jobConf.set("maxFileHandlePath", maxFileHandlePath);
+		jobConf.set("inputBakPath", inputBakPath);
+		jobConf.set("detailOutputPath", detailOutputPath);
+		
 		jobConf.setLong("mapred.min.split.size", 1L);
 		jobConf.setInt("mapred.task.timeout", 3600000);
-		jobConf.setLong("mapred.tasktracker.map.tasks.maximum", maptasks);
+		jobConf.setLong("mapreduce.input.fileinputformat.split.minsize", 1L);
 		// mapper失败重试次数，默认是4.在准生产上有机子挂掉,网络联通不了会导致部分失败，必须设置此参数，否则命中失败次数太多会导致整个Job失败。
 		jobConf.setInt("mapred.max.map.failures.percent", 20);
+		
+    	try {
+			DefaultStringifier.store(hbaseConfiguration, record ,"record");
+		} catch (IOException e) {
+			logger.warn("", e);
+		}
 	}
 
 	private void ConfigJob(Job job) throws IOException {
-		job.setJobName("PutHbaseJOB_" + recordClassName + new SimpleDateFormat("yyyyMM").format(new Date()));
+		job.setJobName("PutHbaseJOB_" + record.getName() + new SimpleDateFormat("yyyyMM").format(new Date()));
 		job.setMapperClass(Map.class);
 		job.setOutputKeyClass(Text.class);
 		job.setOutputValueClass(Text.class);
@@ -212,58 +214,27 @@ public class MRHander extends BaseHandler {
 
 	}
 	
-	
 	private static class Map extends Mapper<LongWritable, Text, Text, IntWritable> {
 		protected static final Logger logger = LoggerFactory.getLogger(Map.class);
-		private static final String CHARTSET = "GBK";
-		private static String recordClassName;
-		private static Record record;
-		private static String[] regions;
-		private static String[] family;
-		private static String[] columns;
-		private static String filterregion;
-		private static String ischgport;
-		private static String isbakinput;
-		private static String inputlargepath;
-		private static Long largesize;
+		private final String CHARTSET = "GBK";
+		private Record record;
+		private Boolean isUseDefaultPort;
+		private String maxFileHandlePath;
+		private Long maxFileSize;
 		private String detail_fileName = "";
-		private static String detailoutputdir;
-		private static String bakdir;
-		private static SimpleDateFormat sf = new SimpleDateFormat("yyyyMMddHH24mmss");
+		private String detailOutputPath;
+		private String inputBakPath;
 
 		@Override
 		protected void setup(Context context) throws IOException, InterruptedException {
 			logger.info("init");
-			recordClassName = context.getConfiguration().get("record");
-			regions = context.getConfiguration().get("region").split(",");
-			family = context.getConfiguration().get("family").split(",");
-			columns = context.getConfiguration().get("column").split(",");
-			filterregion = context.getConfiguration().get("filterregion");
-			ischgport = context.getConfiguration().get("ischgport");
-			isbakinput = context.getConfiguration().get("isbakinput");
-			inputlargepath = context.getConfiguration().get("inputlarge");
-			largesize = Long.valueOf(context.getConfiguration().get("largesize"));
-			detailoutputdir = context.getConfiguration().get("detailoutputdir");
-			bakdir = context.getConfiguration().get("bakdir");
-			try {
-				record = (Record) Class.forName(recordClassName).newInstance();
-
-				// 设置列族
-				record.setFamilyNames(family);
-
-				// 设置列名
-				record.setColumns(columns);
-
-				// 设置分区依据
-				record.setRegions(regions);
-
-				// 设置分区依据
-				record.setFilterRegion(filterregion);
-
-			} catch (Exception e) {
-				e.printStackTrace();
-				logger.error("loadclsError!", e);
-			}
+			isUseDefaultPort = context.getConfiguration().get("isUseDefaultPort").equalsIgnoreCase("true");
+			maxFileHandlePath = context.getConfiguration().get("maxFileHandlePath");
+			maxFileSize = Long.valueOf(context.getConfiguration().get("maxFileSize"));
+			detailOutputPath = context.getConfiguration().get("detailOutputPath");
+			inputBakPath = context.getConfiguration().get("inputBakPath");
+			// Record.class待验证是否为具体实现类
+			record = DefaultStringifier.load(hbaseConfiguration, "key", Record.class);
 			System.out.println("set conf secusse!");
 		}
 
@@ -275,7 +246,7 @@ public class MRHander extends BaseHandler {
 			while (it.hasNext()) {
 				try {
 					ftptools = it.next().getValue();
-					if (ftptools.getFtpClient().changeWorkingDirectory(detailoutputdir)) {
+					if (ftptools.getFtpClient().changeWorkingDirectory(detailOutputPath)) {
 						FTPFile[] files = ftptools.getFtpClient().listFiles(detail_fileName);
 						if (files.length >= 1) {
 							logger.info("rename detailfile:"
@@ -315,7 +286,7 @@ public class MRHander extends BaseHandler {
 			String[] ftpinfo = value.toString().split(":");
 
 			int port = 21;
-			if (ischgport.equals("0"))
+			if (!isUseDefaultPort)
 				port = Integer.valueOf(ftpinfo[1]);
 
 			FtpTools ftp = FtpTools.newInstance(ftpinfo[0], port, ftpinfo[2], ftpinfo[3], ftpinfo[4]);
@@ -328,9 +299,9 @@ public class MRHander extends BaseHandler {
 					FSDataInputStream inStream = null;
 					BufferedReader br = null;
 					// 获取原文件的行数
-					if (largesize < Long.valueOf(ftpinfo[6])) { // 大文件特殊处理
+					if (maxFileSize < Long.valueOf(ftpinfo[6])) { // 大文件特殊处理
 						FileSystem fileSystem = FileSystem.get(context.getConfiguration());
-						Path datapath = new Path(inputlargepath + "/" + ftpinfo[5]);
+						Path datapath = new Path(maxFileHandlePath + "/" + ftpinfo[5]);
 						FSDataOutputStream out = fileSystem.create(datapath);
 						ftp.download(ftpinfo[5], out);
 						out.close();
@@ -402,7 +373,7 @@ public class MRHander extends BaseHandler {
 				String runtime = ManagementFactory.getRuntimeMXBean().getName();
 				Integer processnum = Integer.parseInt(runtime.substring(0, runtime.indexOf("@")));
 				;
-				String date = sf.format(new Date());
+				String date = new SimpleDateFormat("yyyyMMddHH24mmss").format(new Date());
 				detail_fileName = context.getJobID().toString() + "_" + hostname + "_" + processnum + "_" + date
 						+ ".tmp";
 			}
@@ -410,7 +381,7 @@ public class MRHander extends BaseHandler {
 			String content = ftpinfo[0] + "|" + ftpinfo[4] + "/" + ftpinfo[5] + "|" + ftpinfo[6] + "|" + linenum + "|"
 					+ inputlinenum + "\n";
 			InputStream is = new ByteArrayInputStream(content.getBytes());
-			boolean flag = ftp.writeFile(is, detailoutputdir, detail_fileName);
+			boolean flag = ftp.writeFile(is, detailOutputPath, detail_fileName);
 			is.close();
 			if (!flag) {
 				throw new IOException("write detail file isSuccess:" + flag);
@@ -424,13 +395,13 @@ public class MRHander extends BaseHandler {
 			} else {
 				try {
 					if (ftp.connectServer()) {
-						if (!detailoutputdir.equals("-1")) {
+						if (detailOutputPath!=null && !detailOutputPath.equals("")) {
 							detailbak(context, ftpinfo, ftp, linenum, inputlinenum);
 						}
-						if ("0".equals(isbakinput)) {
+						if (inputBakPath==null || inputBakPath.contains("")) {
 							logger.info("delete file:" + ftpinfo[5] + "," + ftp.delete(ftpinfo[5]));
 						} else {
-							String tofiledir = getTofilename(ftpinfo[4], bakdir);
+							String tofiledir = getTofilename(ftpinfo[4], inputBakPath);
 							ftp.rename(ftpinfo[4] + "/" + ftpinfo[5], tofiledir + "/" + ftpinfo[5]);
 						}
 					} else {
@@ -445,12 +416,12 @@ public class MRHander extends BaseHandler {
 			}
 		}
 
-		private String getTofilename(String dir, String bakdir) {
+		private String getTofilename(String dir, String inputBakPath) {
 			int idx = dir.lastIndexOf("/");
 			if (dir.length() == idx + 1)
 				idx = dir.lastIndexOf("/", idx - 1);
 
-			String tofiledir = dir.substring(0, idx) + "/" + bakdir;
+			String tofiledir = dir.substring(0, idx) + "/" + inputBakPath;
 			return tofiledir;
 		}
 	}

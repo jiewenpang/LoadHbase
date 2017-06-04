@@ -1,6 +1,8 @@
 package com.asiainfo.loadhbase.resource;
 
 import java.io.BufferedReader;
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
@@ -19,21 +21,41 @@ import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.io.compress.Compression;
 import org.apache.hadoop.hbase.regionserver.BloomType;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.io.ArrayWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.Writable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public abstract class Record {
+public abstract class Record implements Writable {
 	protected static final Logger logger = LoggerFactory.getLogger(Record.class);
+	protected String name;
 	protected String tablePrefix;
-	protected String[] regions;
-	protected String[] familyNames;
+	protected String[] familys;
 	protected String[] columns;
+	protected String[] regions;
 	protected String filterRegion;
 	public Map<String, Table> mapTable = new HashMap<String, Table>();
-
+	
 	public abstract boolean checkFileName(String name);
 
 	public abstract int buildRecord(String filename, BufferedReader br, Connection connection) throws Exception;
+
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public String getTablePrefix() {
+		return tablePrefix;
+	}
+
+	public void setTablePrefix(String tablePrefix) {
+		this.tablePrefix = tablePrefix;
+	}
 
 	public String[] getRegions() {
 		return regions;
@@ -43,12 +65,12 @@ public abstract class Record {
 		this.regions = regions;
 	}
 
-	public String[] getFamilyNames() {
-		return familyNames;
+	public String[] getFamilys() {
+		return familys;
 	}
 
-	public void setFamilyNames(String[] familyNames) {
-		this.familyNames = familyNames;
+	public void setFamilys(String[] familys) {
+		this.familys = familys;
 	}
 
 	public String[] getColumns() {
@@ -67,11 +89,49 @@ public abstract class Record {
 		this.filterRegion = filterRegion;
 	}
 
+	@Override
+	public void readFields(DataInput arg0) throws IOException {
+    	Text tx = new Text();
+    	ArrayWritable aw = new ArrayWritable(Text.class);
+
+    	tx.readFields(arg0);
+    	tablePrefix = tx.toString();
+    	
+    	aw.readFields(arg0);
+    	familys = aw.toStrings();
+
+    	aw.readFields(arg0);
+    	columns = aw.toStrings();
+    	
+    	aw.readFields(arg0);
+    	regions = aw.toStrings();
+
+    	tx.readFields(arg0);
+    	filterRegion = tx.toString();
+	}
+
+	@Override
+	public void write(DataOutput arg0) throws IOException {
+		new Text(tablePrefix).write(arg0);
+		GetArrayText(familys).write(arg0);
+		GetArrayText(columns).write(arg0);
+		GetArrayText(regions).write(arg0);
+		new Text(filterRegion).write(arg0);
+	}
+	
+	private ArrayWritable GetArrayText(String[] strings) {
+    	Text[] values = new Text[strings.length];
+        for (int i = 0; i < strings.length; i++) {
+          values[i] = new Text(strings[i]);
+        }
+        
+    	return new ArrayWritable(Text.class, values);
+	}
+
 	public static boolean creatTable(String tableName, String[] family, byte[][] region, Connection connection)
 			throws MasterNotRunningException, ZooKeeperConnectionException, IOException {
-		boolean flag = false;
-		Admin admin = connection.getAdmin();
 		HTableDescriptor desc = new HTableDescriptor(TableName.valueOf(tableName));
+		
 		for (int i = 0; i < family.length; i++) {
 			HColumnDescriptor cl = new HColumnDescriptor(family[i]);
 			cl.setMaxVersions(1);
@@ -79,17 +139,15 @@ public abstract class Record {
 			cl.setCompressionType(Compression.Algorithm.SNAPPY);
 			desc.addFamily(cl);
 		}
-		if (admin.tableExists(desc.getTableName())) {
-			logger.info("table " + tableName + " Exists!");
-		} else {
-			if (region != null)
-				admin.createTable(desc, region);
-			else
-				admin.createTable(desc);
+		
+		try {
+			connection.getAdmin().createTable(desc, region);
 			logger.info("create table " + tableName + " Success!");
-			flag = true;
+		} catch (org.apache.hadoop.hbase.TableExistsException e){
+			logger.info("table " + tableName + " Exists!");
 		}
-		return flag;
+		
+		return true;
 	}
 
 	public static void addColumn(Table table, String rowKey, String family, String[] columns, String[] values,
@@ -114,8 +172,7 @@ public abstract class Record {
 			try {
 				table.put(put);
 			} catch (Exception e) {
-				logger.info("put flushtotable exception:" + e.getMessage());
-				logger.info("flushtotable wait 300ms");
+				logger.info("put flushtotable exception,wait 300ms and try again:" + e.getMessage());
 				try {
 					Thread.sleep(300);
 				} catch (InterruptedException e1) {
@@ -134,7 +191,7 @@ public abstract class Record {
 		Delete deleteColumn = new Delete(Bytes.toBytes(rowKey));
 		deleteColumn.addColumns(Bytes.toBytes(falilyName), Bytes.toBytes(columnName));
 		table.delete(deleteColumn);
-		logger.info(falilyName + ":" + columnName + "is deleted!");
+		logger.info(falilyName + ":" + columnName + " is deleted!");
 	}
 
 	public static void deleteAllColumn(String tableName, String rowKey, Connection connection) throws IOException {
@@ -148,7 +205,7 @@ public abstract class Record {
 		Admin admin = connection.getAdmin();
 		admin.disableTables(tableName);
 		admin.deleteTables(tableName);
-		logger.info(tableName + "is deleted!");
+		logger.info(tableName + " is deleted!");
 	}
 
 }

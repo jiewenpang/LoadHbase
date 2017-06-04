@@ -22,21 +22,15 @@ public abstract class BaseHandler {
 	protected static Connection connection;
 	protected static FileSystem fileSystem;
 	protected ELExplain<?> strExplain;
+	protected Record record;
 
 	protected String name;
 	protected String ftpInfo;
 	protected String listFileCmd;
 	protected String remoteType;
-	protected String ischgport;
-	protected String icfgport;
-	protected String recordClassName;
-	protected String region;
-	protected String tabFamily;
-	
-	protected int maptotalnum;
-	protected String column;
-	protected String filterregion;
-	
+	protected String portOfSsh;
+	protected Boolean isUseDefaultPort;
+
 	protected void initProperty() {
 		if (BaseHandler.fileSystem == null) {
 			throw new IllegalStateException();
@@ -63,8 +57,8 @@ public abstract class BaseHandler {
 			FtpTools ftp = FtpTools.newInstance(ftpdesc[0], Integer.valueOf(ftpdesc[1]), ftpdesc[2], ftpdesc[3], ftpdesc[4]);
 			try {
 				logger.info("ftpInfo->"+ftpdesc[0]+":"+Integer.valueOf(ftpdesc[1])+":"+ftpdesc[4]+",cmds:"+cmds);
-				if (ftp.connectServer(Integer.valueOf(remoteType), Integer.valueOf(icfgport))) {
-					totalsize += ftp.getMapList((Record) Class.forName(recordClassName).newInstance(), cmds, fileInfoList);
+				if (ftp.connectServer(Integer.valueOf(remoteType), Integer.valueOf(portOfSsh))) {
+					totalsize += ftp.getMapList(record, cmds, fileInfoList);
 
 				} else {
 					logger.error("login fail!" + ftpInfo);
@@ -107,6 +101,62 @@ public abstract class BaseHandler {
 
 	public static void setConnection(Connection connection) {
 		BaseHandler.connection = connection;
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public String getFtpInfo() {
+		return ftpInfo;
+	}
+
+	public void setFtpInfo(String ftpInfo) {
+		this.ftpInfo = ftpInfo;
+	}
+
+	public String getListFileCmd() {
+		return listFileCmd;
+	}
+
+	public void setListFileCmd(String listFileCmd) {
+		this.listFileCmd = listFileCmd;
+	}
+
+	public String getRemoteType() {
+		return remoteType;
+	}
+
+	public void setRemoteType(String remoteType) {
+		this.remoteType = remoteType;
+	}
+
+	public String getPortOfSsh() {
+		return portOfSsh;
+	}
+
+	public void setPortOfSsh(String portOfSsh) {
+		this.portOfSsh = portOfSsh;
+	}
+
+	public Boolean getIsUseDefaultPort() {
+		return isUseDefaultPort;
+	}
+
+	public void setIsUseDefaultPort(Boolean isUseDefaultPort) {
+		this.isUseDefaultPort = isUseDefaultPort;
+	}
+
+	public Record getRecord() {
+		return record;
+	}
+
+	public void setRecord(Record record) {
+		this.record = record;
 	}
 
 	public static class FileInfo {

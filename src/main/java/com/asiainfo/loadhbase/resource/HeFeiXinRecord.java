@@ -11,12 +11,9 @@ import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class HeFeiXinRecord extends Record {
-	protected static final Logger logger = LoggerFactory.getLogger(HeFeiXinRecord.class);
-	public static final String END = "90";
+	private static final String END = "90";
 	private static int MAX_SEQ_LENGTH = 9;
 
 	@Override
@@ -52,9 +49,9 @@ public class HeFeiXinRecord extends Record {
 							for (int j = 0; j < getRegions().length; j++) {
 								regs[j] = Bytes.toBytes(getRegions()[j]);
 							}
-							creatTable(tableName, getFamilyNames(), regs, connection);
+							creatTable(tableName, getFamilys(), regs, connection);
 						} else {
-							creatTable(tableName, getFamilyNames(), null, connection);
+							creatTable(tableName, getFamilys(), null, connection);
 						}
 
 						table = connection.getTable(TableName.valueOf(tableName));
@@ -77,7 +74,7 @@ public class HeFeiXinRecord extends Record {
 						.append(filename).append("|").append(getSeqString(linenum));
 
 				// Èë¿â
-				addColumn(table, getIdentity(line.substring(172, 300)), getFamilyNames()[0], getColumns(),
+				addColumn(table, getIdentity(line.substring(172, 300)), getFamilys()[0], getColumns(),
 						new String[] { line }, null);
 
 			}

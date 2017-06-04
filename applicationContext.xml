@@ -20,61 +20,71 @@
 	<bean id="property" class="com.asiainfo.loadhbase.Constant">
 		<property name="propertyMap">
 			<util:map map-class="java.util.HashMap">
-				<entry key="LOG_PATH" value="./log" />
-				<entry key="LOGBACK_CONF_FILE" value="./logback.xml" />
-				<entry key="krb5conf" value="/home/bd_qzdzx/krb5.conf" />
-				<entry key="keytab" value="/home/bd_qzdzx/user.keytab" />
-				<entry key="jaasconf" value="/opt/client/HDFS/hadoop/etc/hadoop/jaas.conf" />
-				<entry key="principal" value="bd_qzdzx@HADOOP.COM" />
+				<entry key="LOG_PATH"		value="./log" />
+				<entry key="LOGBACK_CONF_FILE"	value="./logback.xml" />
+				<entry key="krb5conf"		value="/home/bd_qzdzx/krb5.conf" />
+				<entry key="keytab"			value="/home/bd_qzdzx/user.keytab" />
+				<entry key="jaasconf"		value="/opt/client/HDFS/hadoop/etc/hadoop/jaas.conf" />
+				<entry key="principal"		value="bd_qzdzx@HADOOP.COM" />
 			</util:map>
 		</property>
 	</bean>
 
 	<bean id="mrHander" class="com.asiainfo.loadhbase.handler.MRHander" >
-		<property name="name"		value="mrHander" />
-		<property name="ftpInfo"	value="172.16.0.138:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk1/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk4/BOSS/bak" />
-		<property name="listFileCmd"	value="ls |head -100000" />		<!-- 罗列远端文件列表的命令 -->
-		<property name="remoteType"	value="1" />						<!-- 1为用ftp方式获取文件列表，2为用ssh方式获取文件列表 -->
-		<property name="ischgport"	value="false" />					<!-- ftp获取文件是否统一为端口号21，否则使用ftpInfo的端口获取 -->
-		<property name="icfgport"	value="22" />						<!-- ssh连接获取文件列表时使用的端口号 -->
-		<property name="maptotalnum"	value="600" />					<!-- 之后定集群最大的任务数 -->
-		<property name="recordClassName" >								<!-- 指定处理的文件类 -->
+		<property name="name"				value="mrHander" />
+		<property name="ftpInfo"			value="172.16.0.138:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk1/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk4/BOSS/bak" />
+		<property name="listFileCmd"		value="ls |head -100000" />		<!-- 罗列远端文件列表的命令 -->
+		<property name="remoteType"			value="1" />					<!-- 1为用ftp方式获取文件列表，2为用ssh方式获取文件列表 -->
+		<property name="isUseDefaultPort"	value="false" />				<!-- true表示ftp获取文件统一端口号为21，否则使用ftpInfo的端口获取 -->
+		<property name="portOfSsh"			value="22" />					<!-- ssh连接获取文件列表时使用的端口号 -->
+		<property name="record" >											<!-- 指定处理的文件类 -->
 			<ref bean="bossRecord" />
 		</property>
 		
-		<property name="tdnum"		value="50" />						<!-- 每tdnum个文件起一个map -->
-		<property name="input"		value="/GMCCDATALOAD_INPUT" />		<!-- 中间文件存放地 -->
-		<property name="inputlarge"	value="1073741824" />  				<!-- 中间文件存放地 -->
-		<property name="isbakinput"	value="0" />						<!-- 0表示不备份 -->
-		<property name="isShardByFileNum"	value="true" />				<!-- true为按文件数量分片，false为按文件大小 -->
-		<property name="bakdir"		value="/GMCCDATALOAD_BAK" />		<!-- 0表示不备份 -->
-		<property name="largesize" 	value="1073741824" />				<!-- 超过此数量的文件放入hdfs解压处理 -->
-		<property name="maptasks"	value="32" />						<!-- 单机最多的map数 -->
-		<property name="detailoutputdir"	value="/detailoutputdir" />	<!-- -1表示无需出明细文件-->
-		<property name="detailoutputdir"	value="/detailoutputdir" />	<!-- -1表示无需出明细文件-->
+		<property name="isShardByFileNum"	value="true" />					<!-- true为按文件数量分片，false为按文件大小 -->
+		<property name="maxMapInJob"		value="600" />					<!-- 整个集群最大的任务数 -->
+		<property name="maxTaskPerNode"		value="32" />					<!-- 每个节点最多的map数 -->
+		<property name="filesPerTask"		value="50" />					<!-- 每filesPerTask个输入文件生成一个中间文件，起一个map -->
+		<property name="inputHdfsPath"		value="/GMCCDATALOAD_INPUT" />	<!-- map任务的输入目录，即中间文件存放地 -->
+		<property name="maxFileSize" 		value="1073741824" />			<!-- 超过此数量的文件放入hdfs处理，场景为账单大文件 -->
+		<property name="maxFileHandlePath"	value="/GMCCDATALOAD_MAXBAK" />	<!-- 超过maxFileSize大小的文件，放入此目录进行处理 -->
+		<property name="inputBakPath"		value="/GMCCDATALOAD_BAK" />	<!-- 非空即表示要备份 -->
+		<property name="detailOutputPath"	value="/detailoutputdir" />		<!-- 非空即表示要出明细文件，场景为用于文件级对账 -->
 	</bean>
 	
 	<bean id="noMRHander" class="com.asiainfo.loadhbase.handler.NoMRHander" >
-		<property name="name"  value="noMRHander" />
-		<property name="ftpInfo"	value="172.16.0.138:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk1/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk4/BOSS/bak" />
-		<property name="listFileCmd"	value="ls |head -100000" />		<!-- 罗列远端文件列表的命令 -->
-		<property name="remoteType"	value="1" />						<!-- 1为用ftp方式获取文件列表，2为用ssh方式获取文件列表 -->
-		<property name="ischgport"	value="false" />					<!-- ftp获取文件是否统一为端口号21，否则使用ftpInfo的端口获取 -->
-		<property name="icfgport"	value="22" />						<!-- ssh连接获取文件列表时使用的端口号 -->
-		<property name="maptotalnum"	value="600" />					<!-- 之后定集群最大的任务数 -->
-		<property name="recordClassName" >								<!-- 指定处理的文件类 -->
+		<property name="name"				value="noMRHander" />
+		<property name="ftpInfo"			value="172.16.0.138:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk1/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk4/BOSS/bak" />
+		<property name="listFileCmd"		value="ls |head -100000" />		<!-- 罗列远端文件列表的命令 -->
+		<property name="remoteType"			value="1" />					<!-- 1为用ftp方式获取文件列表，2为用ssh方式获取文件列表 -->
+		<property name="isUseDefaultPort"	value="false" />				<!-- true表示ftp获取文件统一端口号为21，否则使用ftpInfo的端口获取 -->
+		<property name="portOfSsh"			value="22" />					<!-- ssh连接获取文件列表时使用的端口号 -->
+		<property name="record" >											<!-- 指定处理的文件类 -->
 			<ref bean="bossRecord" />
 		</property>
 	</bean>
-	
-	<bean id="bossRecord" class="com.asiainfo.loadhbase.resource.BOSSRecord" >
-		<property name="name"  value="bossRecord" />
-		<property name="fileNamePrefix"  value="mrHander" />
-		<property name="region"  value="100860031,10630038,106350096138" />
-		<property name="tabFamily"  value="Info" />
-		<property name="tableNamePrefix"  value="BOSS_" />
-		<property name="column"  value="Header,Area,Body" />  <!-- EventFormatType,Area,Cdr -->
-		<property name="filterregion"  value="06,09" />
+
+	<bean id="bossRecord" class="com.asiainfo.loadhbase.resource.BOSSRecord">
+		<property name="name" value="bossRecord" />
+		<property name="tableNamePrefix" value="BOSS_" />
+		<property name="familys">
+			<list>
+				<value>INFO</value>
+			</list>
+		</property>
+		<property name="columns" >  <!-- EventFormatType,Area,Cdr -->
+			<list>
+				<value>Header</value>
+				<value>Area</value>
+				<value>Body</value>
+			</list>
+		<property name="regions" >
+			<list>
+				<value>100860031</value>
+				<value>10630038</value>
+				<value>106350096138</value>
+			</list>
+		<property name="filterRegion" value="06,09" />
 	</bean>
 	
 </beans>

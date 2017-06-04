@@ -9,21 +9,14 @@ import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class GroupBillRecord extends Record {
-	protected static final Logger logger = LoggerFactory.getLogger(GroupBillRecord.class);
-	public static final String START = "START|"; // 账单起始位置
-	public static final String END = "END"; // 账单结束位置
-
+	private static final String START = "START|"; // 账单起始位置
+	private static final String END = "END"; // 账单结束位置
+	private static final char DELIMITER = '|';
+	private static final char BODY_ITEM_DELIMITER = '^';
 	private boolean isGroupBill = false; // 验证是否为集团账单
-
 	private int BILL_TYPE = 0; // 1=集团新总账单 2=集团明细账单 3=集团代付账单
-
-	public static final char DELIMITER = '|';
-	public static final char BODY_ITEM_DELIMITER = '^';
-
 	private String _area; // 地市公司
 
 	/**
@@ -79,9 +72,9 @@ public class GroupBillRecord extends Record {
 				for (int j = 0; j < getRegions().length; j++) {
 					regs[j] = Bytes.toBytes(getRegions()[j]);
 				}
-				creatTable(tableName, getFamilyNames(), regs, connection);
+				creatTable(tableName, getFamilys(), regs, connection);
 			} else {
-				creatTable(tableName, getFamilyNames(), null, connection);
+				creatTable(tableName, getFamilys(), null, connection);
 			}
 
 			table = connection.getTable(TableName.valueOf(tableName));
@@ -131,7 +124,7 @@ public class GroupBillRecord extends Record {
 				billcount++;
 
 				// 入库
-				addColumn(table, getHBaseRowKey(), getFamilyNames()[0], getColumns(),
+				addColumn(table, getHBaseRowKey(), getFamilys()[0], getColumns(),
 						new String[] { head, _area, body.toString() }, "GBK");
 
 			}
