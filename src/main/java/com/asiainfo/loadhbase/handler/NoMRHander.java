@@ -1,16 +1,10 @@
 package com.asiainfo.loadhbase.handler;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.Date;
 import java.util.List;
-import java.util.Map.Entry;
-
-import com.asiainfo.loadhbase.tool.FtpTools;
-import com.asiainfo.loadhbase.tool.LCompress;
 
 public class NoMRHander extends BaseHandler {
 
@@ -39,60 +33,15 @@ public class NoMRHander extends BaseHandler {
 		for (int i = 0; i < fileinfolist.size(); i++) {
 			String value = fileinfolist.get(i).getFileinfo();
 			String[] ftpinfo = value.toString().split(":");
-
-			int port = 21;
-			if (!isUseDefaultPort)
-				port = Integer.valueOf(ftpinfo[1]);
-
-			FtpTools ftp = FtpTools.newInstance(ftpinfo[0], port, ftpinfo[2], ftpinfo[3], ftpinfo[4]);
-			System.out.println("contents is" + value.toString() + " port:" + port);
-			try {
-				if (ftp.connectServer()) {
-					byte[] bos = ftp.download2Buf(ftpinfo[5]);
-					if (bos.length == 0) {
-						logger.info(ftpinfo[5] + "file is empty");
-						return;
-					}
-					if (ftpinfo[5].toLowerCase().endsWith(".z")) {// 解压
-						bos = LCompress.deCompress(bos);
-					}
-					ByteArrayInputStream bin = new ByteArrayInputStream(bos);
-					BufferedReader br = new BufferedReader(new InputStreamReader(bin));
-					long starttime = System.currentTimeMillis();
-					logger.info("start DealFile:" + ftpinfo[5]);
-					bin.close();
-					// 业务处理
-					int linenum = record.buildRecord(ftpinfo[5], br, null);
-
-					long endtime = System.currentTimeMillis();
-					logger.info("insert Hbase Finish!recodeCount:" + linenum + ",Time Consuming:" + (endtime - starttime) + "ms.");
-					System.out.println(ftpinfo[5] + ":process:" + linenum);
-					boolean bIsdelete = ftp.delete(ftpinfo[5]);
-					System.out.println("delete " + ftpinfo[5] + " :" + bIsdelete);
-				}
-			} catch (Exception e) {
-				System.out.println("connect ftp" + value.toString() + "error!");
-				e.printStackTrace();
-				StringBuffer sb = new StringBuffer();
-				StackTraceElement[] stackArray = e.getStackTrace();
-				for (int ii = 0; ii < stackArray.length; ii++) {
-					StackTraceElement element = stackArray[ii];
-					if (element.toString().indexOf("asiainfo") != -1)
-						sb.append(element.toString() + "\n");
-				}
-				throw new InterruptedException(sb.toString());
-			}
+			
+			MapProcessOneFile(hbaseConfiguration, record, ftpinfo, maxFileHandlePath, Long.parseLong(maxFileSize), 
+					detailOutputPath, inputBakPath, detailOutputFileName, 
+					"PutHbaseJOB_NoMRHander"+ new SimpleDateFormat("yyyyMM").format(new Date()));
 		}
 	}
 	
 	public void cleanup() throws IOException, InterruptedException {
-		Iterator<Entry<String, FtpTools>> it = FtpTools.ftpClientList.entrySet().iterator();
-		while (it.hasNext()) {
-			try {
-				it.next().getValue().disConnect();
-			} catch (Exception e) {
-			}
-		}
+		MapCleanUp(record, maxFileHandlePath, detailOutputPath, detailOutputFileName);
 	}
 
 }

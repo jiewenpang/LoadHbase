@@ -31,63 +31,15 @@ public abstract class Record implements Writable {
 	protected static final Logger logger = LoggerFactory.getLogger(Record.class);
 	protected String name;
 	protected String tablePrefix;
+	protected String filterRegion;
 	protected String[] familys;
 	protected String[] columns;
 	protected String[] regions;
-	protected String filterRegion;
 	public Map<String, Table> mapTable = new HashMap<String, Table>();
 	
 	public abstract boolean checkFileName(String name);
 
 	public abstract int buildRecord(String filename, BufferedReader br, Connection connection) throws Exception;
-
-	public String getName() {
-		return name;
-	}
-
-	public void setName(String name) {
-		this.name = name;
-	}
-
-	public String getTablePrefix() {
-		return tablePrefix;
-	}
-
-	public void setTablePrefix(String tablePrefix) {
-		this.tablePrefix = tablePrefix;
-	}
-
-	public String[] getRegions() {
-		return regions;
-	}
-
-	public void setRegions(String[] regions) {
-		this.regions = regions;
-	}
-
-	public String[] getFamilys() {
-		return familys;
-	}
-
-	public void setFamilys(String[] familys) {
-		this.familys = familys;
-	}
-
-	public String[] getColumns() {
-		return columns;
-	}
-
-	public void setColumns(String[] columns) {
-		this.columns = columns;
-	}
-
-	public String getFilterRegion() {
-		return filterRegion;
-	}
-
-	public void setFilterRegion(String filterRegion) {
-		this.filterRegion = filterRegion;
-	}
 
 	@Override
 	public void readFields(DataInput arg0) throws IOException {
@@ -109,7 +61,7 @@ public abstract class Record implements Writable {
     	tx.readFields(arg0);
     	filterRegion = tx.toString();
 	}
-
+	
 	@Override
 	public void write(DataOutput arg0) throws IOException {
 		new Text(tablePrefix).write(arg0);
@@ -206,6 +158,54 @@ public abstract class Record implements Writable {
 		admin.disableTables(tableName);
 		admin.deleteTables(tableName);
 		logger.info(tableName + " is deleted!");
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public String getTablePrefix() {
+		return tablePrefix;
+	}
+
+	public void setTablePrefix(String tablePrefix) {
+		this.tablePrefix = tablePrefix;
+	}
+
+	public String getFilterRegion() {
+		return filterRegion;
+	}
+
+	public void setFilterRegion(String filterRegion) {
+		this.filterRegion = filterRegion;
+	}
+
+	public String[] getFamilys() {
+		return familys;
+	}
+
+	public void setFamilys(String[] familys) {
+		this.familys = familys;
+	}
+
+	public String[] getColumns() {
+		return columns;
+	}
+
+	public void setColumns(String[] columns) {
+		this.columns = columns;
+	}
+
+	public String[] getRegions() {
+		return regions;
+	}
+
+	public void setRegions(String[] regions) {
+		this.regions = regions;
 	}
 
 }
