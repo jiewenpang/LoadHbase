@@ -10,12 +10,8 @@ import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class BillRecord extends Record {
-	protected static final Logger logger = LoggerFactory.getLogger(BillRecord.class);
-	
 	private static final String START = "START|";
 	private static final String END = "END";
 	private static final int ACCNO_INDEX = 0;
@@ -62,7 +58,7 @@ public class BillRecord extends Record {
 		// 按文件名的日期建表
 
 		String tableName = tablePrefix + filename.split("_")[2].substring(0, 6);
-		System.out.println("currTableName:" + tableName);
+		logger.info("currTableName:" + tableName);
 
 		table = mapTable.get(tableName);
 		if (table == null) {
@@ -97,7 +93,7 @@ public class BillRecord extends Record {
 
 			// 账单体解析
 			if ((!line.matches(".*\\|.*\\|.*") || line.split("\\|", -1).length != 3) && !line.startsWith(END)) {
-				System.out.println("error mobile:" + _mobNo + "error context:" + line);
+				logger.info("error mobile:" + _mobNo + "error context:" + line);
 				bflag = true;
 			}
 

@@ -32,10 +32,10 @@ import com.asiainfo.loadhbase.MainApp;
 import com.asiainfo.loadhbase.resource.Record;
 
 public class MRHander extends BaseHandler {
-	protected boolean isShardByFileNum;
-	protected int maxMapInJob;
-	protected int maxTaskPerNode;
-	protected int filesPerTask;
+	private boolean isShardByFileNum;
+	private int maxTaskInJob;
+	private int maxTaskPerNode;
+	private int filesPerTask;
 
 	@Override
 	public void run() throws Exception {
@@ -53,7 +53,7 @@ public class MRHander extends BaseHandler {
 
 		// 输入文件信息分批存放到hdfs的中间文件列表，每个文件对应一个map任务
 		Path inputpath = new Path(inputHdfsPath);
-		FileInfoToHDFS(inputpath, fileInfoList, totalSize / maxMapInJob, isShardByFileNum);
+		FileInfoToHDFS(inputpath, fileInfoList, totalSize / maxTaskInJob, isShardByFileNum);
 		logger.info("Put fileInfoList to hdfs success");
 
 		// 作业集群参数配置
@@ -115,18 +115,34 @@ public class MRHander extends BaseHandler {
 	}
 
 	private void IndividuationJobConf(JobConf jobConf) {
-		jobConf.setLong("mapred.tasktracker.map.tasks.maximum", maxTaskPerNode);
-		jobConf.setLong("mapreduce.input.fileinputformat.split.maxsize", 150 * filesPerTask);
 		jobConf.set("maxFileSize", maxFileSize);
 		jobConf.set("maxFileHandlePath", maxFileHandlePath);
 		jobConf.set("inputBakPath", inputBakPath);
 		jobConf.set("detailOutputPath", detailOutputPath);
-		
-		jobConf.setLong("mapred.min.split.size", 1L);
+
+		// 单位ms，默认10分钟，但此处设置为1小时
 		jobConf.setInt("mapred.task.timeout", 3600000);
-		jobConf.setLong("mapreduce.input.fileinputformat.split.minsize", 1L);
-		// mapper失败重试次数，默认是4.在准生产上有机子挂掉,网络联通不了会导致部分失败，必须设置此参数，否则命中失败次数太多会导致整个Job失败。
+		// 一般配置为cpu核心数，但需要考虑IO和不影响实时任务
+		jobConf.setLong("mapred.tasktracker.map.tasks.maximum", maxTaskPerNode);
+		// mapper允许tasktracker失败的百分比
 		jobConf.setInt("mapred.max.map.failures.percent", 20);
+		
+		/*
+		 * splitSize=max{max{minSplitSize(默认为1B),mapred.min.split.size}, 
+		 * 				 min{mapred.max.split.size(默认Long.MAX_VALUE),dfs.blockSize(默认60MB)}}
+		 * 
+		 * 分片大小和map的关系，伪代码为：
+		 * while (fileSize / splitSize > 1.1) {
+		 * 		map.run splitSize;
+		 * 		fileSize -= splitSize;
+		 * }
+		 * map.run fileSize;
+		 * 
+		 * 预计一行平均小于150字节，则splitSize为maxsize，可以保证每个中间文件只由一个map处理
+		 */
+		jobConf.setLong("mapred.min.split.size", 1L);
+		jobConf.setLong("mapreduce.input.fileinputformat.split.minsize", 1L);
+		jobConf.setLong("mapreduce.input.fileinputformat.split.maxsize", 150 * filesPerTask);
 		
     	try {
 			DefaultStringifier.store(hbaseConfiguration, record ,"record");
@@ -136,7 +152,7 @@ public class MRHander extends BaseHandler {
 	}
 
 	private void ConfigJob(Job job) throws IOException {
-		job.setJobName("PutHbaseJOB_" + record.getName() + new SimpleDateFormat("yyyyMM").format(new Date()));
+		job.setJobName("PutHbaseJOB_" + record.getName() +"_"+ new SimpleDateFormat("yyyyMM").format(new Date()));
 		job.setMapperClass(Map.class);
 		job.setOutputKeyClass(Text.class);
 		job.setOutputValueClass(Text.class);
@@ -214,15 +230,15 @@ public class MRHander extends BaseHandler {
 		@Override
 		protected void cleanup(Context context) throws IOException, InterruptedException {
 			
-			MapCleanUp(record, maxFileHandlePath, detailOutputPath, detailOutputFileName);
+			NormalCleanUp(record, maxFileHandlePath, detailOutputPath, detailOutputFileName);
 		}
 
 		@Override
 		protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
 			logger.info("contents is:" + value.toString());
-			String[] ftpinfo = value.toString().split(":");
+			String[] fileInfo = value.toString().split(":");
 			
-			MapProcessOneFile(context.getConfiguration(), record, ftpinfo, maxFileHandlePath, 
+			NormalProcessOneFile(context.getConfiguration(), record, fileInfo, maxFileHandlePath, 
 					maxFileSize, detailOutputPath, inputBakPath, detailOutputFileName, context.getJobID().toString());
 		}
 

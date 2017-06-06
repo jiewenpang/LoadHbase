@@ -24,6 +24,10 @@ public class Constant {
 	private static final String ZOOKEEPER_DEFAULT_SERVER_PRINCIPAL = "zookeeper/hadoop";
 
 	public void initLog() throws IOException {
+		/*
+		 * 此处仅为客户端的日志，而mapred的日志由yarn管理，可由以下命令获取：
+		 * yarn logs -applicationId xxxid > xxxid.log 2>&1 (由客户端日志确定applicationId,如检索"Submitted application")
+		 */
 		System.setProperty("LOG_HOME", propertyMap.get("LOG_PATH"));
 
 		File logbackConfFile = new File(propertyMap.get("LOGBACK_CONF_FILE"));

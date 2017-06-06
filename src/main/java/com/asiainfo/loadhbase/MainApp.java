@@ -31,10 +31,11 @@ public class MainApp {
 
 		// 启动每个业务
 		BaseHandler.setAppContext(appContext);
-		Map<String, BaseHandler> beans = BaseHandler.getAppContext().getBeansOfType(BaseHandler.class);
+		@SuppressWarnings("unchecked")
+		Map<String, BaseHandler> beans = (Map<String, BaseHandler>) appContext.getBean("realHander");
         for(BaseHandler bean : beans.values()) {
         	bean.run();
         }
-        
 	}
+
 }

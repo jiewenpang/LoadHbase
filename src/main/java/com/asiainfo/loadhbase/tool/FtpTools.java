@@ -44,7 +44,7 @@ public class FtpTools {
 
 	public static Map<String, FtpTools> ftpClientList = new HashMap<String, FtpTools>();
 
-	public FtpTools(String ip, int port, String username, String password, String dir) {
+	private FtpTools(String ip, int port, String username, String password, String dir) {
 		this.ip = ip;
 		this.port = port;
 		this.username = username;
@@ -62,8 +62,7 @@ public class FtpTools {
 	 * @param dir
 	 */
 	public static FtpTools newInstance(String ip, int port, String username, String password, String dir) {
-		FtpTools f = ftpClientList.get(new StringBuffer().append(ip).append(port).append(username).append(dir)
-				.toString());
+		FtpTools f = ftpClientList.get(new StringBuffer().append(ip).append(port).append(username).append(dir).toString());
 		if (f == null) {
 			f = new FtpTools(ip, port, username, password, dir);
 		}

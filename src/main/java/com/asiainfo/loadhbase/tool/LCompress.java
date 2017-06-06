@@ -216,7 +216,6 @@ final class Compressor extends Comp_Base {
 	private int ratio;
 	private int checkpoint;
 	private int in_count; /* length of input */
-	private int out_count; /* # of codes output */
 	private int bytes_out; /* length of compressed output */
 
 	private Hash_Table htab;
@@ -234,7 +233,6 @@ final class Compressor extends Comp_Base {
 
 		offset = 0;
 		bytes_out = 3; /* includes 3-byte header mojo */
-		out_count = 0;
 		clear_flg = 0;
 		ratio = 0;
 		in_count = 1;
@@ -301,7 +299,6 @@ final class Compressor extends Comp_Base {
 			}
 
 			output(ent);
-			out_count++;
 			ent = c;
 			if (free_ent < maxmaxcode) {
 				codetab.set(i, free_ent++); /* code -> hashtable */
@@ -313,7 +310,6 @@ final class Compressor extends Comp_Base {
 		 * Put out the final code.
 		 */
 		output(ent);
-		out_count++;
 		output(-1);
 
 		return;

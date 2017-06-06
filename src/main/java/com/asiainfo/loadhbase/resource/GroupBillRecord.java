@@ -63,7 +63,7 @@ public class GroupBillRecord extends Record {
 		getFileType(filename);
 
 		String tableName = tablePrefix + filename.split("_")[1].substring(5, 11);
-		System.out.println("currTableName:" + tableName);
+		logger.info("currTableName:" + tableName);
 
 		table = mapTable.get(tableName);
 		if (table == null) {
@@ -92,25 +92,20 @@ public class GroupBillRecord extends Record {
 				continue;
 			}
 
-			// System.out.println("billcount="+billcount);
-
 			// 账单体解析
 			if (BILL_TYPE == 1 || BILL_TYPE == 2) {
 				if ((!line.matches(".*\\|.*\\|.*") || line.split("\\|", -1).length != 3) && !line.startsWith(END)) {
-					System.out.println("current type=" + BILL_TYPE + " error context:" + line);
+					logger.info("current type=" + BILL_TYPE + " error context:" + line);
 					bflag = true;
 				}
 			} else {
 				// 集团代付账单 长度不一
 				if (!line.matches(".*\\|.*\\|.*") && !line.startsWith(END)) {
-					// System.out.println("current type="+BILL_TYPE+" error context:"
-					// + line);
 					bflag = true;
 				}
 			}
 
 			if (bflag) {
-				// System.out.println("continue body");
 				continue; // 不再拼接账单体
 			} else {
 				String reDelimitedLine = line.replace(DELIMITER, BODY_ITEM_DELIMITER);
@@ -225,7 +220,6 @@ public class GroupBillRecord extends Record {
 			}
 			// code....
 		}
-		// System.out.println("TYPE="+BILL_TYPE+"  "+sb.toString());
 		return sb.toString();
 	}
 
@@ -246,7 +240,7 @@ public class GroupBillRecord extends Record {
 			} else if (fileName.contains("JTDFZD")) {
 				BILL_TYPE = 3;
 			} else {
-				System.out.println("无此账单类型");
+				logger.info("无此账单类型");
 				return;
 			}
 
@@ -282,7 +276,6 @@ public class GroupBillRecord extends Record {
 			if (end == -1) {
 				end = line.length();
 			}
-			// System.out.println("split = " + line.substring(start, end));
 			ret.add(line.substring(start, end));
 			start = end + 1;
 		}

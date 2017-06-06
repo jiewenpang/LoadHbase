@@ -25,7 +25,6 @@ public class HbaseLoginUtil {
 	private static final String LOGIN_FAILED_CAUSE_PRINCIPAL_WRONG = "(no rule) principal format not support by default, need add property hadoop.security.auth_to_local(in core-site.xml) value RULE:[1:$1] RULE:[2:$1]";
 	private static final String LOGIN_FAILED_CAUSE_TIME_OUT = "(time out) can not connect to kdc server or there is fire wall in the network";
 	private static final boolean IS_IBM_JDK = System.getProperty("java.vendor").contains("IBM");
-	private static final boolean IS_WINDOWS_OS = System.getProperty("os.name").toLowerCase().contains("windows");
 
 	public synchronized static void login(String userPrincipal, String userKeytabPath, String krb5ConfPath, Configuration conf) throws IOException {
 		// 1.check input parameters

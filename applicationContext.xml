@@ -30,47 +30,87 @@
 		</property>
 	</bean>
 
+	<alias name="realHander" 				alias="mrHander" />						<!-- 选择具体处理策略 -->
+	<alias name="realRecord"				alias="bossRecord223" />				<!-- 选择具体处理类 -->
+	
 	<bean id="mrHander" class="com.asiainfo.loadhbase.handler.MRHander" >
 		<property name="name"				value="mrHander" />
-		<property name="ftpInfo"			value="172.16.0.138:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk1/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk4/BOSS/bak" />
+		<property name="ftpInfo"			value="#{realRecord.ftpInfo}" />
 		<property name="listFileCmd"		value="ls -lrt | awk '{print $5&quot;|&quot;$9}' |head -15000" />		<!-- 罗列远端文件列表的命令 -->
-		<property name="remoteType"			value="1" />					<!-- 1为用ftp方式获取文件列表，2为用ssh方式获取文件列表 -->
-		<property name="portOfSsh"			value="22" />					<!-- ssh连接获取文件列表时使用的端口号 -->
-		<property name="inputHdfsPath"		value="/GMCCDATALOAD_INPUT" />	<!-- map任务的输入目录，即中间文件存放地 -->
-		<property name="maxFileSize" 		value="1073741824" />			<!-- 超过此数量的文件放入hdfs处理，场景为账单大文件 -->
-		<property name="maxFileHandlePath"	value="/GMCCDATALOAD_MAXBAK" />	<!-- 超过maxFileSize大小的文件，放入此目录进行处理 -->
-		<property name="inputBakPath"		value="/GMCCDATALOAD_BAK" />	<!-- 非空即表示要备份 -->
-		<property name="detailOutputPath"	value="/detailoutputdir" />		<!-- 非空即表示要出明细文件，场景为用于文件级对账 -->
-		<property name="record" >											<!-- 指定处理的文件类 -->
-			<ref bean="bossRecord" />
+		<property name="remoteType"			value="1" />							<!-- 1为用ftp方式获取文件列表，2为用ssh方式获取文件列表 -->
+		<property name="portOfSsh"			value="22" />							<!-- ssh连接获取文件列表时使用的端口号 -->
+		<property name="inputHdfsPath"		value="#{realRecord.inputHdfsPath}" />	<!-- map任务的输入目录，即中间文件存放地 -->
+		<property name="maxFileSize" 		value="1073741824" />					<!-- 超过此数量的文件放入hdfs处理，场景为账单大文件 -->
+		<property name="maxFileHandlePath"	value="#{realRecord.maxFileHandlePath" />	<!-- 超过maxFileSize大小的文件，放入此目录进行处理 -->
+		<property name="inputBakPath"		value="#{realRecord.inputBakPath}" />	<!-- 非空即表示要备份 -->
+		<property name="detailOutputPath"	value="/detailoutputdir" />				<!-- 非空即表示要出明细文件，场景为用于文件级对账 -->
+		<property name="record" >													<!-- 指定处理的文件类 -->
+			<ref bean="realRecord" />
 		</property>
 		
-		<property name="isShardByFileNum"	value="true" />					<!-- true为按文件数量分片，false为按文件大小 -->
-		<property name="maxMapInJob"		value="600" />					<!-- 整个集群最大的任务数 -->
-		<property name="maxTaskPerNode"		value="32" />					<!-- 每个节点最多的map数 -->
-		<property name="filesPerTask"		value="50" />					<!-- 每filesPerTask个输入文件生成一个中间文件，起一个map -->
+		<property name="isShardByFileNum"	value="true" />							<!-- true为按文件数量分片，false为按文件大小 -->
+		<property name="maxTaskInJob"		value="200" />							<!-- 整个集群最大的任务数，仅用于isShardByFileNum为false -->
+		<property name="maxTaskPerNode"		value="10" />							<!-- 每个节点最多的map数 -->
+		<property name="filesPerTask"		value="50" />							<!-- 每filesPerTask个输入文件生成一个中间文件，起一个map -->
 	</bean>
 	
 	<bean id="noMRHander" class="com.asiainfo.loadhbase.handler.NoMRHander" >
 		<property name="name"				value="noMRHander" />
-		<property name="ftpInfo"			value="172.16.0.138:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk1/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk4/BOSS/bak" />
-		<property name="listFileCmd"		value="ls |head -100000" />		<!-- 罗列远端文件列表的命令 -->
-		<property name="remoteType"			value="1" />					<!-- 1为用ftp方式获取文件列表，2为用ssh方式获取文件列表 -->
-		<property name="portOfSsh"			value="22" />					<!-- ssh连接获取文件列表时使用的端口号 -->
-		<property name="inputHdfsPath"		value="/GMCCDATALOAD_INPUT" />	<!-- map任务的输入目录，即中间文件存放地 -->
-		<property name="maxFileSize" 		value="1073741824" />			<!-- 超过此数量的文件放入hdfs处理，场景为账单大文件 -->
-		<property name="maxFileHandlePath"	value="/GMCCDATALOAD_MAXBAK" />	<!-- 超过maxFileSize大小的文件，放入此目录进行处理 -->
-		<property name="inputBakPath"		value="/GMCCDATALOAD_BAK" />	<!-- 非空即表示要备份 -->
-		<property name="detailOutputPath"	value="/detailoutputdir" />		<!-- 非空即表示要出明细文件，场景为用于文件级对账 -->
-		<property name="record" >											<!-- 指定处理的文件类 -->
-			<ref bean="bossRecord" />
-		</property>		
+		<property name="ftpInfo"			value="#{realRecord.ftpInfo}" />
+		<property name="listFileCmd"		value="ls -lrt | awk '{print $5&quot;|&quot;$9}' |head -15000" />		<!-- 罗列远端文件列表的命令 -->
+		<property name="remoteType"			value="1" />							<!-- 1为用ftp方式获取文件列表，2为用ssh方式获取文件列表 -->
+		<property name="portOfSsh"			value="22" />							<!-- ssh连接获取文件列表时使用的端口号 -->
+		<property name="inputHdfsPath"		value="#{realRecord.inputHdfsPath}" />	<!-- map任务的输入目录，即中间文件存放地 -->
+		<property name="maxFileSize" 		value="1073741824" />					<!-- 超过此数量的文件放入hdfs处理，场景为账单大文件 -->
+		<property name="maxFileHandlePath"	value="#{realRecord.maxFileHandlePath" />	<!-- 超过maxFileSize大小的文件，放入此目录进行处理 -->
+		<property name="inputBakPath"		value="#{realRecord.inputBakPath}" />	<!-- 非空即表示要备份 -->
+		<property name="detailOutputPath"	value="/detailoutputdir" />				<!-- 非空即表示要出明细文件，场景为用于文件级对账 -->
+		<property name="record" >													<!-- 指定处理的文件类 -->
+			<ref bean="realRecord" />
+		</property>
+		
 	</bean>
 
-	<bean id="bossRecord" class="com.asiainfo.loadhbase.resource.BOSSRecord">
+	<bean id="bossRecord223" class="com.asiainfo.loadhbase.resource.BOSSRecord">
 		<property name="name" value="bossRecord" />
+		<property name="ftpInfo"			value="172.16.0.138:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.138:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk1/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.140:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.141:21:hdptest:testhdp:/mnt/disk4/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk2/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk3/BOSS/bak,172.16.0.142:21:hdptest:testhdp:/mnt/disk4/BOSS/bak" />
+		<property name="inputHdfsPath"		value="/GMCCDATALOAD_INPUT" />
+		<property name="maxFileHandlePath"	value="/GMCCDATALOAD_MAXBAK" />
+		<property name="inputBakPath"		value="" />
 		<property name="tableNamePrefix" value="BOSS_" />
 		<property name="filterRegion" value="999" />
+		<property name="familys">
+			<list>
+				<value>INFO</value>
+			</list>
+		</property>
+		<property name="columns" >
+			<list>
+				<value>EventFormatType</value>
+				<value>Area</value>
+				<value>Cdr</value>
+			</list>
+		</property>
+		<property name="regions" >
+			<list>
+				<value>134</value>
+				<value>135</value>
+				<value>136</value>
+				<value>137</value>
+				<value>138</value>
+				<value>139</value>
+			</list>
+		</property>
+	</bean>
+	
+	<bean id="bossRecord" class="com.asiainfo.loadhbase.resource.BOSSRecord">
+		<property name="name" 				value="bossRecord" />
+		<property name="ftpInfo"			value="192.252.106.49:21:qzd_qd:Audi@369:/data01/HZ_boss_210,192.252.106.50:21:qzd_qd:Audi@369:/data01/HZ_boss_211,192.252.106.51:21:qzd_qd:Audi@369:/data01/HZ_boss_212,192.252.106.52:21:qzd_qd:Audi@369:/data01/HZ_boss_213,192.252.106.50:21:qzd_qd:Audi@369:/data02/HZ_boss_211,192.252.106.49:21:qzd_qd:Audi@369:/data02/BOSS/HZ_boss_210,192.252.106.52:21:qzd_qd:Audi@369:/data02/HZ_boss_213,192.252.106.51:21:qzd_qd:Audi@369:/data02/HZ_boss_212" />
+		<property name="inputHdfsPath"		value="/tenant/BIGDATA/QZDZX/QDSSCX/QDCX/GMCCDATALOAD_INPUT" />
+		<property name="maxFileHandlePath"	value="/tenant/BIGDATA/QZDZX/QDSSCX/QDCX/GMCCDATALOAD_BOSS_INPUTLARGE" />
+		<property name="inputBakPath"		value="" />
+		<property name="tableNamePrefix" 	value="BOSS_" />
+		<property name="filterRegion" 		value="999" />
 		<property name="familys">
 			<list>
 				<value>INFO</value>
@@ -88,8 +128,12 @@
 	
 	<bean id="cxbill" class="com.asiainfo.loadhbase.resource.BillRecord">
 		<property name="name" value="cxbill" />
-		<property name="tableNamePrefix" value="CXBILL_" />
-		<property name="filterRegion" value="999" />
+		<property name="ftpInfo"			value="192.252.106.49:21:qzd_qd:Audi@369:/data02/cxbill" />
+		<property name="inputHdfsPath"		value="/tenant/BIGDATA/QZDZX/QDSSCX/QDCX/GMCCDATALOAD_CXBILL_INPUT" />
+		<property name="maxFileHandlePath"	value="/tenant/BIGDATA/QZDZX/QDSSCX/QDCX/GMCCDATALOAD_CXBILL_INPUTLARGE" />
+		<property name="inputBakPath"		value="" />
+		<property name="tableNamePrefix" 	value="CXBILL_" />
+		<property name="filterRegion" 		value="999" />
 		<property name="familys">
 			<list>
 				<value>INFO</value>
@@ -115,8 +159,12 @@
 	
 	<bean id="hebill" class="com.asiainfo.loadhbase.resource.BillRecord">
 		<property name="name" value="hebill" />
-		<property name="tableNamePrefix" value="HEBILL_" />
-		<property name="filterRegion" value="999" />
+		<property name="ftpInfo"			value="192.252.106.49:21:qzd_qd:Audi@369:/data02/he_zd" />
+		<property name="inputHdfsPath"		value="/tenant/BIGDATA/QZDZX/QDSSCX/QDCX/GMCCDATALOAD_HEBILL_INPUT" />
+		<property name="maxFileHandlePath"	value="/tenant/BIGDATA/QZDZX/QDSSCX/QDCX/GMCCDATALOAD_HEBILL_INPUTLARGE" />
+		<property name="inputBakPath"		value="" />
+		<property name="tableNamePrefix" 	value="HEBILL_" />
+		<property name="filterRegion" 		value="999" />
 		<property name="familys">
 			<list>
 				<value>INFO</value>
@@ -142,8 +190,12 @@
 	
 	<bean id="llbill" class="com.asiainfo.loadhbase.resource.BillRecord">
 		<property name="name" value="llbill" />
-		<property name="tableNamePrefix" value="LLBILL_" />
-		<property name="filterRegion" value="999" />
+		<property name="ftpInfo"			value="192.252.106.49:21:qzd_qd:Gmcc@123:/data02/liul_zd" />
+		<property name="inputHdfsPath"		value="/tenant/BIGDATA/QZDZX/QDSSCX/QDCX/GMCCDATALOAD_LLBILL_INPUT" />
+		<property name="maxFileHandlePath"	value="/tenant/BIGDATA/QZDZX/QDSSCX/QDCX/GMCCDATALOAD_LLBILL_INPUTLARGE" />
+		<property name="inputBakPath"		value="" />
+		<property name="tableNamePrefix" 	value="LLBILL_" />
+		<property name="filterRegion" 		value="999" />
 		<property name="familys">
 			<list>
 				<value>INFO</value>
@@ -169,8 +221,12 @@
 	
 	<bean id="jtbill" class="com.asiainfo.loadhbase.resource.GroupBillRecord">
 		<property name="name" value="jtbill" />
-		<property name="tableNamePrefix" value="GROUPBILL_" />
-		<property name="filterRegion" value="999" />
+		<property name="ftpInfo"			value="192.252.106.49:21:qzd_qd:Gmcc@123:/cdrfile/data/jk4/jt/groupbill/yj,192.252.106.49:21:qzd_qd:Gmcc@123:/cdrfile/data/jk4/jt/groupbill/ej,192.252.106.49:21:qzd_qd:Gmcc@123:/cdrfile/data/jk4/jt/groupbill/df" />
+		<property name="inputHdfsPath"		value="/tenant/BIGDATA/QZDZX/QDSSCX/QDCX/GMCCDATALOAD_JTZD_INPUT" />
+		<property name="maxFileHandlePath"	value="/tenant/BIGDATA/QZDZX/QDSSCX/QDCX/GMCCDATALOAD_JTZD_INPUTLARGE" />
+		<property name="inputBakPath"		value="" />
+		<property name="tableNamePrefix" 	value="GROUPBILL_" />
+		<property name="filterRegion" 		value="999" />
 		<property name="familys">
 			<list>
 				<value>INFO</value>
@@ -196,8 +252,12 @@
 	
 	<bean id="hefetionbill" class="com.asiainfo.loadhbase.resource.HeFeiXinRecord">
 		<property name="name" value="hefetionbill" />
-		<property name="tableNamePrefix" value="NMS_" />
-		<property name="filterRegion" value="999" />
+		<property name="ftpInfo"			value="192.252.106.49:21:qzd_qd:Audi@369:/data02/hfx" />
+		<property name="inputHdfsPath"		value="/tenant/BIGDATA/QZDZX/QDSSCX/QDCX/GMCCDATALOAD_HEFETION_INPUT" />
+		<property name="maxFileHandlePath"	value="" />
+		<property name="inputBakPath"		value="" />
+		<property name="tableNamePrefix" 	value="NMS_" />
+		<property name="filterRegion" 		value="999" />
 		<property name="familys">
 			<list>
 				<value>INFO</value>

@@ -32,16 +32,16 @@ public class NoMRHander extends BaseHandler {
 	public void ProcessFile(List<FileInfo> fileinfolist) throws IOException, InterruptedException {
 		for (int i = 0; i < fileinfolist.size(); i++) {
 			String value = fileinfolist.get(i).getFileinfo();
-			String[] ftpinfo = value.toString().split(":");
+			String[] fileInfo = value.toString().split(":");
 			
-			MapProcessOneFile(hbaseConfiguration, record, ftpinfo, maxFileHandlePath, Long.parseLong(maxFileSize), 
+			NormalProcessOneFile(hbaseConfiguration, record, fileInfo, maxFileHandlePath, Long.parseLong(maxFileSize), 
 					detailOutputPath, inputBakPath, detailOutputFileName, 
 					"PutHbaseJOB_NoMRHander"+ new SimpleDateFormat("yyyyMM").format(new Date()));
 		}
 	}
 	
 	public void cleanup() throws IOException, InterruptedException {
-		MapCleanUp(record, maxFileHandlePath, detailOutputPath, detailOutputFileName);
+		NormalCleanUp(record, maxFileHandlePath, detailOutputPath, detailOutputFileName);
 	}
 
 }
