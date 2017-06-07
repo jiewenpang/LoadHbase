@@ -31,9 +31,8 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.FileSystemXmlApplicationContext;
 
 import com.asiainfo.loadhbase.resource.Record;
-import com.asiainfo.loadhbase.tool.FtpTools;
+import com.asiainfo.loadhbase.tool.RemoteTools;
 import com.asiainfo.loadhbase.tool.LCompress;
-import com.asiainfo.util.ELExplain;
 
 public abstract class BaseHandler {
 	protected static final Logger logger = LoggerFactory.getLogger(BaseHandler.class);
@@ -41,7 +40,6 @@ public abstract class BaseHandler {
 	protected static Configuration hbaseConfiguration;
 	protected static Connection connection;
 	protected static FileSystem fileSystem;
-	protected ELExplain<?> strExplain;
 
 	protected String name;
 	protected String ftpInfo;
@@ -66,12 +64,12 @@ public abstract class BaseHandler {
 
 	protected Long GetEveryFileInfo(List<FileInfo> fileInfoList) throws IllegalStateException {
 		String[] ftpInfoList = ftpInfo.split(",");
-		Long totalsize = 0l;
+		long totalsize = 0l;
 		
 		for (String ftpInfo : ftpInfoList) {
 			String[] ftpdesc = ftpInfo.split(":");
 			if (ftpdesc.length != 5) {
-				logger.error("ftp config error:" + ftpInfo);
+				logger.error("rmtTools config error:" + ftpInfo);
 				throw new IllegalStateException();
 			}
 			
@@ -80,14 +78,14 @@ public abstract class BaseHandler {
 			 * ftpInfo样例：192.252.106.49:21:qzd_qd:Audi@369:/data02/cxbill
 			 * FileInfo样例：192.252.106.50:21:qzd_qd:Audi@369:/data02/HZ_boss_211:boss.11.1130511512.20.0.201706.20170606.GZ0Q.ZHZW.Z:14859
 			 */
-			StringBuffer buf = new StringBuffer();
-			buf.append(listFileCmd);
+			StringBuffer buf = new StringBuffer(listFileCmd);
 			String cmds = buf.insert(buf.indexOf("|"), ftpdesc[4]).toString();
-			FtpTools ftp = FtpTools.newInstance(ftpdesc[0], Integer.valueOf(ftpdesc[1]), ftpdesc[2], ftpdesc[3], ftpdesc[4]);
+			RemoteTools rmtTools = RemoteTools.newInstance(ftpdesc[0], Integer.valueOf(ftpdesc[1]), ftpdesc[2], ftpdesc[3], ftpdesc[4]);
+			
 			try {
-				logger.info("ftpInfo->"+ftpdesc[0]+":"+Integer.valueOf(ftpdesc[1])+":"+ftpdesc[4]+",cmds:"+cmds);
-				if (ftp.connectServer(Integer.valueOf(remoteType), Integer.valueOf(portOfSsh))) {
-					totalsize += ftp.getMapList(record, cmds, fileInfoList);
+				logger.info("ftpInfo:"+Arrays.toString(ftpdesc) + ",cmds:"+cmds);
+				if (rmtTools.sshConnectServer(Integer.valueOf(portOfSsh))) {
+					totalsize += rmtTools.sshGetFileInfoList(record, cmds, fileInfoList);
 				} else {
 					logger.error("login fail!" + ftpInfo);
 					throw new IllegalStateException();
@@ -103,30 +101,30 @@ public abstract class BaseHandler {
 
 	protected static void NormalCleanUp(Record record, String maxFileHandlePath, String detailOutputPath, 
 			String detailOutputFileName) throws IOException {
-		logger.info("NormalCleanUp:" + FtpTools.ftpClientList.size());
+		logger.info("NormalCleanUp:" + RemoteTools.getFtpClientList().size());
 
 		// 移走明细文件，并断开ftp
-		FtpTools ftptools = null;
-		Iterator<Entry<String, FtpTools>> it = FtpTools.ftpClientList.entrySet().iterator();
+		RemoteTools rmtTools = null;
+		Iterator<Entry<String, RemoteTools>> it = RemoteTools.getFtpClientList().entrySet().iterator();
 		while (it.hasNext()) {
 			try {
-				ftptools = it.next().getValue();
-				if (ftptools.getFtpClient().changeWorkingDirectory(detailOutputPath)) {
-					FTPFile[] files = ftptools.getFtpClient().listFiles(detailOutputFileName);
+				rmtTools = it.next().getValue();
+				if (rmtTools.getFtpClient().changeWorkingDirectory(detailOutputPath)) {
+					FTPFile[] files = rmtTools.getFtpClient().listFiles(detailOutputFileName);
 					if (files.length >= 1) {
 						logger.info("rename detailfile:" + detailOutputFileName + ",result:" 
-							+ ftptools.rename(detailOutputFileName, detailOutputFileName.substring(0, detailOutputFileName.length() - 4)));
+							+ rmtTools.rename(detailOutputFileName, detailOutputFileName.substring(0, detailOutputFileName.length() - 4)));
 					}
 				}
 
-				if (ftptools.isConned()) {
-					ftptools.disConnect();
+				if (rmtTools.isConnected()) {
+					rmtTools.disConnect();
 				}
 			} catch (Exception e) {
-				logger.warn("close ftp exception:", e);
+				logger.warn("close rmtTools exception:", e);
 			}
 		}
-		FtpTools.ftpClientList.clear();
+		RemoteTools.getFtpClientList().clear();
 
 		// 刷新并关闭表
 		if (!record.mapTable.isEmpty()) {
@@ -148,11 +146,11 @@ public abstract class BaseHandler {
 		}
 		
 		final String CHARTSET = "GBK";
-		FtpTools ftp = FtpTools.newInstance(fileInfo[0], Integer.valueOf(fileInfo[1]), fileInfo[2], fileInfo[3], fileInfo[4]);
+		RemoteTools rmtTools = RemoteTools.newInstance(fileInfo[0], Integer.valueOf(fileInfo[1]), fileInfo[2], fileInfo[3], fileInfo[4]);
 		int linenum = 0;// 文件总行数,无文件头
 		int inputlinenum = 0;// 实际入库行数
 		try {
-			if (ftp.connectServer()) {
+			if (rmtTools.ftpConnectServer()) {
 				logger.info("connect success!");
 				ByteArrayInputStream bin = null;
 				FSDataInputStream inStream = null;
@@ -162,21 +160,21 @@ public abstract class BaseHandler {
 					FileSystem fileSystem = FileSystem.get(conf);
 					Path datapath = new Path(maxFileHandlePath + "/" + fileInfo[5]);
 					FSDataOutputStream out = fileSystem.create(datapath);
-					ftp.download(fileInfo[5], out);
+					rmtTools.downLoad2Stream(fileInfo[5], out);
 					out.close();
 					inStream = fileSystem.open(datapath);
 					br = new BufferedReader(new InputStreamReader(inStream, CHARTSET));
 				} else {
-					byte[] bos = ftp.download2Buf(fileInfo[5]);
-					logger.info("download2Buf finish!");
+					byte[] bos = rmtTools.downLoad2Buf(fileInfo[5]);
+					logger.info("downLoad2Buf finish!");
 					if (bos.length == 0) {
 						logger.info(fileInfo[5] + "file is empty");
 						return;
 					}
 					if (fileInfo[5].toLowerCase().endsWith(".z")) {// 解压
-						logger.info("ftp:deCompress");
+						logger.info("rmtTools:deCompress");
 						bos = LCompress.deCompress(bos);
-						logger.info("ftp:deCompress finish");
+						logger.info("rmtTools:deCompress finish");
 					}
 					bin = new ByteArrayInputStream(bos);
 					br = new BufferedReader(new InputStreamReader(bin, CHARTSET));
@@ -188,9 +186,9 @@ public abstract class BaseHandler {
 				linenum = record.buildRecord(fileInfo[5], br, connection);
 				logger.info("insert Hbase Finish!recodeCount:" + linenum + ",Time Consuming:" + (System.currentTimeMillis() - starttime) + "ms.");
 				logger.info(fileInfo[5] + ":process" + linenum);
-				RecursionDeleleFile(ftp, fileInfo, 3, linenum, inputlinenum, detailOutputPath, inputBakPath, detailOutputFileName, jobName);
+				RecursionDeleleFile(rmtTools, fileInfo, 3, linenum, inputlinenum, detailOutputPath, inputBakPath, detailOutputFileName, jobName);
 			} else {
-				logger.info("ftp error!");
+				logger.info("rmtTools error!");
 			}
 		} catch (SocketException e) {
 			logger.error("map SocketException:" + e.getMessage());
@@ -205,37 +203,37 @@ public abstract class BaseHandler {
 		}
 	}
 
-	private static void RecursionDeleleFile(FtpTools ftp, String[] fileInfo, int times, int linenum,
+	private static void RecursionDeleleFile(RemoteTools rmtTools, String[] fileInfo, int times, int linenum,
 			int inputlinenum, String detailOutputPath, String inputBakPath, String detailOutputFileName, String jobName) {
 		if (times <= 0) {
 			logger.error("recursiondelfile fail filename:" + fileInfo[5]);
 		} else {
 			try {
-				if (ftp.connectServer()) {
+				if (rmtTools.ftpConnectServer()) {
 					if (detailOutputPath!=null && !detailOutputPath.equals("")) {
-						BakDetailFile(fileInfo, ftp, linenum, inputlinenum, detailOutputPath, detailOutputFileName, jobName);
+						BakDetailFile(fileInfo, rmtTools, linenum, inputlinenum, detailOutputPath, detailOutputFileName, jobName);
 					}
 					if (inputBakPath==null || inputBakPath.contains("")) {
-						logger.info("delete file:" + fileInfo[5] + "," + ftp.delete(fileInfo[5]));
+						logger.info("delete file:" + fileInfo[5] + "," + rmtTools.delete(fileInfo[5]));
 					} else {
 						String tofiledir = getTofilename(fileInfo[4], inputBakPath);
-						ftp.rename(fileInfo[4] + "/" + fileInfo[5], tofiledir + "/" + fileInfo[5]);
+						rmtTools.rename(fileInfo[4] + "/" + fileInfo[5], tofiledir + "/" + fileInfo[5]);
 					}
 				} else {
-					logger.warn("ftp login fail!");
+					logger.warn("rmtTools login fail!");
 				}
 			} catch (IOException e) {
 				times = times - 1;
 				logger.warn("recursiondelfile IOException:" + e.getMessage());
 				e.printStackTrace();
-				RecursionDeleleFile(ftp, fileInfo, times, linenum, inputlinenum, detailOutputPath, inputBakPath, 
+				RecursionDeleleFile(rmtTools, fileInfo, times, linenum, inputlinenum, detailOutputPath, inputBakPath, 
 						detailOutputFileName, jobName);
 			}
 		}
 	}
 
-	// ftp 接口机备份 处理过的文件
-	private static void BakDetailFile(String[] fileInfo, FtpTools ftp, int linenum, int inputlinenum, 
+	// rmtTools 接口机备份 处理过的文件
+	private static void BakDetailFile(String[] fileInfo, RemoteTools rmtTools, int linenum, int inputlinenum, 
 			String detailOutputPath, String detailOutputFileName, String jobName) throws UnknownHostException, IOException {
 
 		// 文件名:JobId_当前处理map主机名_当前处理主机map进程号_yyyymmddhh24miss
@@ -251,7 +249,7 @@ public abstract class BaseHandler {
 		String content = fileInfo[0] + "|" + fileInfo[4] + "/" + fileInfo[5] + "|" + fileInfo[6] + "|" + linenum + "|"
 				+ inputlinenum + "\n";
 		InputStream is = new ByteArrayInputStream(content.getBytes());
-		boolean flag = ftp.writeFile(is, detailOutputPath, detailOutputFileName);
+		boolean flag = rmtTools.writeFile(is, detailOutputPath, detailOutputFileName);
 		is.close();
 		if (!flag) {
 			throw new IOException("write detail file isSuccess:" + flag);
@@ -336,6 +334,54 @@ public abstract class BaseHandler {
 		this.portOfSsh = portOfSsh;
 	}
 	
+	public String getInputHdfsPath() {
+		return inputHdfsPath;
+	}
+
+	public void setInputHdfsPath(String inputHdfsPath) {
+		this.inputHdfsPath = inputHdfsPath;
+	}
+
+	public String getMaxFileSize() {
+		return maxFileSize;
+	}
+
+	public void setMaxFileSize(String maxFileSize) {
+		this.maxFileSize = maxFileSize;
+	}
+
+	public String getMaxFileHandlePath() {
+		return maxFileHandlePath;
+	}
+
+	public void setMaxFileHandlePath(String maxFileHandlePath) {
+		this.maxFileHandlePath = maxFileHandlePath;
+	}
+
+	public String getInputBakPath() {
+		return inputBakPath;
+	}
+
+	public void setInputBakPath(String inputBakPath) {
+		this.inputBakPath = inputBakPath;
+	}
+
+	public String getDetailOutputPath() {
+		return detailOutputPath;
+	}
+
+	public void setDetailOutputPath(String detailOutputPath) {
+		this.detailOutputPath = detailOutputPath;
+	}
+
+	public String getDetailOutputFileName() {
+		return detailOutputFileName;
+	}
+
+	public void setDetailOutputFileName(String detailOutputFileName) {
+		this.detailOutputFileName = detailOutputFileName;
+	}
+
 	public Record getRecord() {
 		return record;
 	}

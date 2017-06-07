@@ -1,7 +1,6 @@
 package com.asiainfo.loadhbase;
 
 import java.io.IOException;
-import java.util.Map;
 
 import org.springframework.context.support.FileSystemXmlApplicationContext;
 
@@ -31,11 +30,10 @@ public class MainApp {
 
 		// 启动每个业务
 		BaseHandler.setAppContext(appContext);
-		@SuppressWarnings("unchecked")
-		Map<String, BaseHandler> beans = (Map<String, BaseHandler>) appContext.getBean("realHander");
-        for(BaseHandler bean : beans.values()) {
-        	bean.run();
-        }
+		BaseHandler.setHbaseConfiguration(Constant.getHadoopConfig());
+		BaseHandler.setConnection(Constant.getConnection());
+		BaseHandler bean = (BaseHandler) appContext.getBean("realHander");
+		bean.run();
 	}
 
 }

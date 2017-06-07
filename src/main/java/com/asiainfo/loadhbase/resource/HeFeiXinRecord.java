@@ -39,7 +39,7 @@ public class HeFeiXinRecord extends Record {
 				linenum++;
 				// 解析头文件
 				if (linenum == 1) {
-					tableName = tablePrefix + filename.substring(3, 9);
+					tableName = tableNamePrefix + filename.substring(3, 9);
 					logger.info("currTableName:" + tableName);
 
 					table = mapTable.get(tableName);

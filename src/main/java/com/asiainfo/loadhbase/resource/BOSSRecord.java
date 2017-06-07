@@ -36,7 +36,7 @@ public class BOSSRecord extends Record {
 				linenum++;
 				// 按照第一行建表
 				if (linenum == 1) {
-					tableName = tablePrefix + sb.substring(139, 145);
+					tableName = tableNamePrefix + sb.substring(139, 145);
 					logger.info("currTableName:" + tableName);
 
 					table = mapTable.get(tableName);

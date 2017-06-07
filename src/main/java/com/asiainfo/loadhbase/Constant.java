@@ -68,6 +68,7 @@ public class Constant {
 				
 			} catch (IOException e) {
 				e.printStackTrace();
+				System.exit(1);
 			}
 
 		}
@@ -75,6 +76,14 @@ public class Constant {
 	
 	public void setPropertyMap(HashMap<String, String> propertyMap) {
 		Constant.propertyMap = propertyMap;
+	}
+
+	public static Configuration getHadoopConfig() {
+		return hadoopConfig;
+	}
+
+	public static void setHadoopConfig(Configuration hadoopConfig) {
+		Constant.hadoopConfig = hadoopConfig;
 	}
 
 	public static Connection getConnection() {

@@ -62,7 +62,7 @@ public class GroupBillRecord extends Record {
 
 		getFileType(filename);
 
-		String tableName = tablePrefix + filename.split("_")[1].substring(5, 11);
+		String tableName = tableNamePrefix + filename.split("_")[1].substring(5, 11);
 		logger.info("currTableName:" + tableName);
 
 		table = mapTable.get(tableName);

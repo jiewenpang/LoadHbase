@@ -159,8 +159,40 @@ public class MRHander extends BaseHandler {
 		job.setOutputFormatClass(NullOutputFormat.class);
 		job.setNumReduceTasks(0);
 		job.setJarByClass(MainApp.class);
-		TableMapReduceUtil.addDependencyJars(job);
-		TableMapReduceUtil.initCredentials(job);
+/*		TableMapReduceUtil.addDependencyJars(job);
+		TableMapReduceUtil.initCredentials(job);*/
+	}
+
+	public boolean getIsShardByFileNum() {
+		return isShardByFileNum;
+	}
+
+	public void setIsShardByFileNum(boolean isShardByFileNum) {
+		this.isShardByFileNum = isShardByFileNum;
+	}
+
+	public int getMaxTaskInJob() {
+		return maxTaskInJob;
+	}
+
+	public void setMaxTaskInJob(int maxTaskInJob) {
+		this.maxTaskInJob = maxTaskInJob;
+	}
+
+	public int getMaxTaskPerNode() {
+		return maxTaskPerNode;
+	}
+
+	public void setMaxTaskPerNode(int maxTaskPerNode) {
+		this.maxTaskPerNode = maxTaskPerNode;
+	}
+
+	public int getFilesPerTask() {
+		return filesPerTask;
+	}
+
+	public void setFilesPerTask(int filesPerTask) {
+		this.filesPerTask = filesPerTask;
 	}
 
 	private static class CreatHDFSFile extends Thread {

@@ -30,11 +30,16 @@ import org.slf4j.LoggerFactory;
 public abstract class Record implements Writable {
 	protected static final Logger logger = LoggerFactory.getLogger(Record.class);
 	protected String name;
-	protected String tablePrefix;
+	protected String tableNamePrefix;
 	protected String filterRegion;
 	protected String[] familys;
 	protected String[] columns;
 	protected String[] regions;
+	protected String ftpInfo;
+	protected String inputHdfsPath;
+	protected String inputBakPath;
+	protected String detailOutputPath;
+	protected String maxFileHandlePath;
 	public Map<String, Table> mapTable = new HashMap<String, Table>();
 	
 	public abstract boolean checkFileName(String name);
@@ -47,7 +52,7 @@ public abstract class Record implements Writable {
     	ArrayWritable aw = new ArrayWritable(Text.class);
 
     	tx.readFields(arg0);
-    	tablePrefix = tx.toString();
+    	tableNamePrefix = tx.toString();
     	
     	aw.readFields(arg0);
     	familys = aw.toStrings();
@@ -64,7 +69,7 @@ public abstract class Record implements Writable {
 	
 	@Override
 	public void write(DataOutput arg0) throws IOException {
-		new Text(tablePrefix).write(arg0);
+		new Text(tableNamePrefix).write(arg0);
 		GetArrayText(familys).write(arg0);
 		GetArrayText(columns).write(arg0);
 		GetArrayText(regions).write(arg0);
@@ -169,11 +174,11 @@ public abstract class Record implements Writable {
 	}
 
 	public String getTablePrefix() {
-		return tablePrefix;
+		return tableNamePrefix;
 	}
 
-	public void setTablePrefix(String tablePrefix) {
-		this.tablePrefix = tablePrefix;
+	public void setTableNamePrefix(String tableNamePrefix) {
+		this.tableNamePrefix = tableNamePrefix;
 	}
 
 	public String getFilterRegion() {
@@ -206,6 +211,46 @@ public abstract class Record implements Writable {
 
 	public void setRegions(String[] regions) {
 		this.regions = regions;
+	}
+
+	public String getFtpInfo() {
+		return ftpInfo;
+	}
+
+	public void setFtpInfo(String ftpInfo) {
+		this.ftpInfo = ftpInfo;
+	}
+
+	public String getInputHdfsPath() {
+		return inputHdfsPath;
+	}
+
+	public void setInputHdfsPath(String inputHdfsPath) {
+		this.inputHdfsPath = inputHdfsPath;
+	}
+
+	public String getInputBakPath() {
+		return inputBakPath;
+	}
+
+	public void setInputBakPath(String inputBakPath) {
+		this.inputBakPath = inputBakPath;
+	}
+
+	public String getDetailOutputPath() {
+		return detailOutputPath;
+	}
+
+	public void setDetailOutputPath(String detailOutputPath) {
+		this.detailOutputPath = detailOutputPath;
+	}
+
+	public String getMaxFileHandlePath() {
+		return maxFileHandlePath;
+	}
+
+	public void setMaxFileHandlePath(String maxFileHandlePath) {
+		this.maxFileHandlePath = maxFileHandlePath;
 	}
 
 }

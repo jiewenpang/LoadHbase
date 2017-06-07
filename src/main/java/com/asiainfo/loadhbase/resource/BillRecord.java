@@ -57,7 +57,7 @@ public class BillRecord extends Record {
 		getFileType(filename);
 		// 按文件名的日期建表
 
-		String tableName = tablePrefix + filename.split("_")[2].substring(0, 6);
+		String tableName = tableNamePrefix + filename.split("_")[2].substring(0, 6);
 		logger.info("currTableName:" + tableName);
 
 		table = mapTable.get(tableName);
