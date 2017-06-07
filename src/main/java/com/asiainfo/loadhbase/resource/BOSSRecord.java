@@ -10,47 +10,34 @@ import org.apache.hadoop.hbase.ZooKeeperConnectionException;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Table;
-import org.apache.hadoop.hbase.util.Bytes;
 
 public class BOSSRecord extends Record {
 	@Override
 	public boolean checkFileName(String name) {
-		boolean flag = false;
-		if (name.toLowerCase().startsWith("boss.")) {
-			flag = true;
-		}
-		return flag;
+		return name.toLowerCase().startsWith("boss.");
 	}
 
 	@Override
 	public int buildRecord(String filename, BufferedReader br, Connection connection) throws InterruptedException {
-		int linenum = 0;
+		int lineNum = 0;
 		String line = "";
-		StringBuilder sb = null;
+		StringBuffer sb = null;
 		Table table = null;
 		String tableName = null;
 
 		try {
 			while ((line = br.readLine()) != null) {
-				sb = new StringBuilder(line);
-				linenum++;
+				sb = new StringBuffer(line);
+				lineNum++;
+				
 				// 按照第一行建表
-				if (linenum == 1) {
+				if (lineNum == 1) {
 					tableName = tableNamePrefix + sb.substring(139, 145);
 					logger.info("currTableName:" + tableName);
 
 					table = mapTable.get(tableName);
 					if (table == null) {
-						if (getRegions().length > 1 || !"".equals(getRegions()[0])) {
-							byte[][] regs = new byte[getRegions().length][];
-							for (int j = 0; j < getRegions().length; j++) {
-								regs[j] = Bytes.toBytes(getRegions()[j]);
-							}
-							creatTable(tableName, getFamilys(), regs, connection);
-						} else {
-							creatTable(tableName, getFamilys(), null, connection);
-						}
-
+						creatTable(tableName, getFamilys(), regions, connection);
 						table = connection.getTable(TableName.valueOf(tableName));
 						((HTable) table).setAutoFlushTo(false);
 						((HTable) table).flushCommits();
@@ -83,18 +70,15 @@ public class BOSSRecord extends Record {
 				}
 
 				// 过滤部分地市
-				if (linenum == 2 && filterRegion.contains(area)) {
+				if (lineNum == 2 && filterRegion.contains(area)) {
 					logger.info("region:" + area);
 					break;
 				}
 
-				// 设置行键
-				StringBuilder hsb = new StringBuilder();
-				hsb.append(telnum).append("|").append(time).append("|").append(filename).append("|").append(linenum);
-
-				// 入库
-				addColumn(table, hsb.toString(), getFamilys()[0], getColumns(), new String[] { line }, null);
-
+				// 设置行键并入库
+				StringBuffer rowKey = new StringBuffer();
+				rowKey.append(telnum).append("|").append(time).append("|").append(filename).append("|").append(lineNum);
+				addColumn(table, rowKey.toString(), getFamilys()[0], getColumns(), new String[] { line }, null);
 			}
 
 			((HTable) table).flushCommits();
@@ -119,7 +103,7 @@ public class BOSSRecord extends Record {
 			}
 		}
 
-		return linenum - 1;
+		return lineNum - 1;
 	}
 
 }

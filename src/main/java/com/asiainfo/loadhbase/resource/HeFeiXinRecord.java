@@ -10,50 +10,33 @@ import org.apache.hadoop.hbase.ZooKeeperConnectionException;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Table;
-import org.apache.hadoop.hbase.util.Bytes;
 
 public class HeFeiXinRecord extends Record {
 	private static final String END = "90";
-	private static int MAX_SEQ_LENGTH = 9;
 
 	@Override
 	public boolean checkFileName(String name) {
-		boolean flag = false;
-		if (name.startsWith("NMS")) {
-			if (name.length() == 18) {
-				flag = true;
-			}
-		}
-		return flag;
+		return name.startsWith("NMS") && name.length() == 18;
 	}
 
 	@Override
 	public int buildRecord(String filename, BufferedReader br, Connection connection) throws InterruptedException {
-		int linenum = 0; // 行号
+		int lineNum = 0; // 行号
 		String line = ""; // 每行数据
 		Table table = null;
 		String tableName = null;
 
 		try {
 			while ((line = br.readLine()) != null) {
-				linenum++;
+				lineNum++;
 				// 解析头文件
-				if (linenum == 1) {
+				if (lineNum == 1) {
 					tableName = tableNamePrefix + filename.substring(3, 9);
 					logger.info("currTableName:" + tableName);
 
 					table = mapTable.get(tableName);
 					if (table == null) {
-						if (getRegions().length > 1 || !"".equals(getRegions()[0])) {
-							byte[][] regs = new byte[getRegions().length][];
-							for (int j = 0; j < getRegions().length; j++) {
-								regs[j] = Bytes.toBytes(getRegions()[j]);
-							}
-							creatTable(tableName, getFamilys(), regs, connection);
-						} else {
-							creatTable(tableName, getFamilys(), null, connection);
-						}
-
+						creatTable(tableName, getFamilys(), regions, connection);
 						table = connection.getTable(TableName.valueOf(tableName));
 						((HTable) table).setAutoFlushTo(false);
 						((HTable) table).flushCommits();
@@ -64,18 +47,15 @@ public class HeFeiXinRecord extends Record {
 				}
 
 				// 过滤尾行数据
-				if (END.equals(line.substring(0, 2))) {
+				if (line.startsWith(END)) {
 					break;
 				}
 
-				// 设置行键
-				StringBuilder hsb = new StringBuilder();
-				hsb.append(getIdentity(line.substring(172, 300))).append("|").append(setStartTime(line)).append("|")
-						.append(filename).append("|").append(getSeqString(linenum));
-
-				// 入库
-				addColumn(table, getIdentity(line.substring(172, 300)), getFamilys()[0], getColumns(),
-						new String[] { line }, null);
+				// 设置行键并入库
+				StringBuffer rowKey = new StringBuffer();
+				rowKey.append(getChargeNum(line)).append("|").append(setStartTime(line)).append("|").append(filename)
+						.append("|").append(String.format("%09d", lineNum));
+				addColumn(table, rowKey.toString(), getFamilys()[0], getColumns(), new String[] { line }, null);
 
 			}
 			((HTable) table).flushCommits();
@@ -101,11 +81,11 @@ public class HeFeiXinRecord extends Record {
 			}
 		}
 
-		return linenum - 1;
+		return lineNum - 1;
 	}
 
-	public String getIdentity(String cdr) {
-		cdr = cdr.trim();
+	public String getChargeNum(String cdr) {
+		cdr = cdr.substring(172, 300).trim();
 		if (cdr.length() > 3) {
 			if (cdr.charAt(0) == '+') {
 				cdr = cdr.substring(1);
@@ -119,26 +99,8 @@ public class HeFeiXinRecord extends Record {
 	}
 
 	public String setStartTime(String cdr) throws NumberFormatException, UnsupportedEncodingException {
-		String starttime = null;
-		int cdr_type = Integer.parseInt(cdr.substring(10, 12));
-
-		if (1 == cdr_type) {
-			starttime = cdr.substring(1402, 1417);
-		} else {
-			starttime = cdr.substring(1432, 1447);
-		}
-		return starttime.trim();
-	}
-
-	public String getSeqString(int seq) {
-		String seqString = Integer.toString(seq);
-		StringBuilder ret = new StringBuilder();
-		int shift = MAX_SEQ_LENGTH - seqString.length();
-		for (int i = 0; i < shift; ++i) {
-			ret.append("0");
-		}
-		ret.append(seqString);
-		return ret.toString();
+		int cdrType = Integer.parseInt(cdr.substring(10, 12));
+		return cdrType==1 ? cdr.substring(1402, 1417).trim() : cdr.substring(1432, 1447).trim();
 	}
 
 }

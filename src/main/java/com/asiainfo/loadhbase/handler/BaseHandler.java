@@ -127,15 +127,15 @@ public abstract class BaseHandler {
 		RemoteTools.getFtpClientList().clear();
 
 		// 刷新并关闭表
-		if (!record.mapTable.isEmpty()) {
-			Iterator<Entry<String, Table>> it1 = record.mapTable.entrySet().iterator();
+		if (!record.getMapTable().isEmpty()) {
+			Iterator<Entry<String, Table>> it1 = record.getMapTable().entrySet().iterator();
 			while (it1.hasNext()) {
 				Entry<String, Table> entry = it1.next();
 				Table table = entry.getValue();
 				table.close(); // 是否要先flush？
 			}
 		}
-		record.mapTable.clear();
+		record.getMapTable().clear();
 	}
 
 	protected static void NormalProcessOneFile(Configuration conf, Record record, String[] fileInfo, String maxFileHandlePath, 

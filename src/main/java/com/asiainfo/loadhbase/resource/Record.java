@@ -40,7 +40,7 @@ public abstract class Record implements Writable {
 	protected String inputBakPath;
 	protected String detailOutputPath;
 	protected String maxFileHandlePath;
-	public Map<String, Table> mapTable = new HashMap<String, Table>();
+	protected Map<String, Table> mapTable = new HashMap<String, Table>();
 	
 	public abstract boolean checkFileName(String name);
 
@@ -85,9 +85,17 @@ public abstract class Record implements Writable {
     	return new ArrayWritable(Text.class, values);
 	}
 
-	public static boolean creatTable(String tableName, String[] family, byte[][] region, Connection connection)
+	public static boolean creatTable(String tableName, String[] family, String[] regions, Connection connection)
 			throws MasterNotRunningException, ZooKeeperConnectionException, IOException {
 		HTableDescriptor desc = new HTableDescriptor(TableName.valueOf(tableName));
+
+		byte[][] regs = null;
+		if (regions.length > 1 || !"".equals(regions[0])) {
+			regs = new byte[regions.length][];
+			for (int j = 0; j < regions.length; j++) {
+				regs[j] = Bytes.toBytes(regions[j]);
+			}
+		}
 		
 		for (int i = 0; i < family.length; i++) {
 			HColumnDescriptor cl = new HColumnDescriptor(family[i]);
@@ -98,7 +106,7 @@ public abstract class Record implements Writable {
 		}
 		
 		try {
-			connection.getAdmin().createTable(desc, region);
+			connection.getAdmin().createTable(desc, regs);
 			logger.info("create table " + tableName + " Success!");
 		} catch (org.apache.hadoop.hbase.TableExistsException e){
 			logger.info("table " + tableName + " Exists!");
@@ -173,7 +181,7 @@ public abstract class Record implements Writable {
 		this.name = name;
 	}
 
-	public String getTablePrefix() {
+	public String getTableNamePrefix() {
 		return tableNamePrefix;
 	}
 
@@ -251,6 +259,14 @@ public abstract class Record implements Writable {
 
 	public void setMaxFileHandlePath(String maxFileHandlePath) {
 		this.maxFileHandlePath = maxFileHandlePath;
+	}
+
+	public Map<String, Table> getMapTable() {
+		return mapTable;
+	}
+
+	public void setMapTable(Map<String, Table> mapTable) {
+		this.mapTable = mapTable;
 	}
 
 }

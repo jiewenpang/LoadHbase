@@ -159,8 +159,8 @@ public class MRHander extends BaseHandler {
 		job.setOutputFormatClass(NullOutputFormat.class);
 		job.setNumReduceTasks(0);
 		job.setJarByClass(MainApp.class);
-/*		TableMapReduceUtil.addDependencyJars(job);
-		TableMapReduceUtil.initCredentials(job);*/
+		TableMapReduceUtil.addDependencyJars(job);
+		TableMapReduceUtil.initCredentials(job);
 	}
 
 	public boolean getIsShardByFileNum() {
