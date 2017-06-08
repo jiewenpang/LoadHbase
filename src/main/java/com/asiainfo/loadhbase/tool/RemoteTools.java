@@ -62,16 +62,12 @@ public class RemoteTools {
 	}
 
 	// ssh连接仅用于获取文件信息
-	public boolean sshConnectServer(int portOfSsh) {
+	public boolean sshConnectServer(int portOfSsh) throws IOException {
 		boolean isAuthenticated = false;
 
-		try {
-			sshConnection = new Connection(ip, portOfSsh);
-			sshConnection.connect();
-			isAuthenticated = sshConnection.authenticateWithPassword(username, password);
-		} catch (IOException e) {
-			logger.info("sshconnect exception:", e.getMessage());
-		}
+		sshConnection = new Connection(ip, portOfSsh);
+		sshConnection.connect();
+		isAuthenticated = sshConnection.authenticateWithPassword(username, password);
 		return isAuthenticated;
 	}
 

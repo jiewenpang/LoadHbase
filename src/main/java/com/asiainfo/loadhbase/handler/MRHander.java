@@ -136,7 +136,7 @@ public class MRHander extends BaseHandler {
 		jobConf.setLong("mapreduce.input.fileinputformat.split.maxsize", 150 * filesPerTask);
 		
     	try {
-			DefaultStringifier.store(hbaseConfiguration, record ,"record");
+			DefaultStringifier.store(jobConf, record ,"record");
 		} catch (IOException e) {
 			logger.warn("", e);
 		}

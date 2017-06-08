@@ -2,6 +2,7 @@ package com.asiainfo.loadhbase.handler;
 
 import java.io.IOException;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.DefaultStringifier;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
@@ -24,16 +25,18 @@ public class MRHandlerMap extends Mapper<LongWritable, Text, Text, IntWritable> 
 	@Override
 	protected void setup(Context context) throws IOException, InterruptedException {
 		logger.info("init");
-		maxFileHandlePath = context.getConfiguration().get("maxFileHandlePath");
-		maxFileSize = Long.valueOf(context.getConfiguration().get("maxFileSize"));
-		detailOutputPath = context.getConfiguration().get("detailOutputPath");
-		inputBakPath = context.getConfiguration().get("inputBakPath");
+		Configuration connection = context.getConfiguration();
+		inputBakPath = connection.get("inputBakPath");
+		maxFileSize = Long.valueOf(connection.get("maxFileSize"));
+		detailOutputPath = connection.get("detailOutputPath");
+		maxFileHandlePath = connection.get("maxFileHandlePath");
+		
 		// Record.class待验证是否为具体实现类
 		try {
-			record = DefaultStringifier.load(context.getConfiguration(), "record", Record.class);
+			record = DefaultStringifier.load(connection, "record", Record.class);
 
 		} catch (java.lang.NullPointerException e) {
-			logger.error("hbaseConfiguration:" + context.getConfiguration() + ", Record.class" + Record.class, e);
+			logger.error("hbaseConfiguration:" + connection + ", Record.class" + Record.class, e);
 			throw new InterruptedException();
 		}
 	}

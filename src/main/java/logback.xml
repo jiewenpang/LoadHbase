@@ -20,7 +20,7 @@
 		</encoder>
 	</appender>
 
-	<logger name="" level="INFO">
+	<logger name="org" level="INFO">
 		<appender-ref ref="STDOUT" />
 	</logger>
 	<logger name="com" level="INFO">

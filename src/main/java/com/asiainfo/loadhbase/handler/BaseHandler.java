@@ -80,11 +80,11 @@ public abstract class BaseHandler {
 			RemoteTools rmtTools = RemoteTools.newInstance(ftpdesc[0], Integer.valueOf(ftpdesc[1]), ftpdesc[2], ftpdesc[3], ftpdesc[4]);
 			
 			try {
-				logger.info("ftpInfo:"+Arrays.toString(ftpdesc) + ",cmds:"+cmds);
+				logger.info("ftpInfo:"+Arrays.toString(ftpdesc) + ",cmds:["+cmds+"]");
 				if (rmtTools.sshConnectServer(Integer.valueOf(portOfSsh))) {
 					totalsize += rmtTools.sshGetFileInfoList(record, cmds, fileInfoList);
 				} else {
-					logger.error("login fail!" + ftpInfo);
+					logger.error("login fail!");
 					throw new IllegalStateException();
 				}
 			} catch (Exception e) {
