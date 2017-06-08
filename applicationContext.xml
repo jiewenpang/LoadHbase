@@ -22,10 +22,9 @@
 			<util:map map-class="java.util.HashMap">
 				<entry key="LOG_PATH"		value="./log" />
 				<entry key="LOGBACK_CONF_FILE"	value="./logback.xml" />
-				<entry key="krb5conf"		value="/home/bd_qzdzx/krb5.conf" />
-				<entry key="keytab"			value="/home/bd_qzdzx/user.keytab" />
-				<entry key="jaasconf"		value="/opt/client/HDFS/hadoop/etc/hadoop/jaas.conf" />
-				<entry key="principal"		value="bd_qzdzx@HADOOP.COM" />
+				<entry key="USERNAME"		value="bd_qzdzx" />
+				<entry key="USERKEYTABFILE"	value="/home/bd_qzdzx/user.keytab" />
+				<entry key="KRB5FILE"		value="/home/bd_qzdzx/krb5.conf" />
 			</util:map>
 		</property>
 	</bean>

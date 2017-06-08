@@ -13,23 +13,15 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.DefaultStringifier;
-import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.NullOutputFormat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.asiainfo.loadhbase.MainApp;
-import com.asiainfo.loadhbase.resource.Record;
 
 public class MRHander extends BaseHandler {
 	private boolean isShardByFileNum;
@@ -121,15 +113,15 @@ public class MRHander extends BaseHandler {
 		jobConf.set("detailOutputPath", detailOutputPath);
 
 		// 单位ms，默认10分钟，但此处设置为1小时
-		jobConf.setInt("mapred.task.timeout", 3600000);
+		jobConf.setInt("mapreduce.task.timeout", 3600000);
 		// 一般配置为cpu核心数，但需要考虑IO和不影响实时任务
-		jobConf.setLong("mapred.tasktracker.map.tasks.maximum", maxTaskPerNode);
+		jobConf.setLong("mapreduce.tasktracker.map.tasks.maximum", maxTaskPerNode);
 		// mapper允许tasktracker失败的百分比
-		jobConf.setInt("mapred.max.map.failures.percent", 20);
+		jobConf.setInt("mapreduce.map.failures.maxpercent", 20);
 		
 		/*
-		 * splitSize=max{max{minSplitSize(默认为1B),mapred.min.split.size}, 
-		 * 				 min{mapred.max.split.size(默认Long.MAX_VALUE),dfs.blockSize(默认60MB)}}
+		 * splitSize=max{max{minSplitSize(默认为1B),mapreduce.input.fileinputformat.split.minsize}, 
+		 * 				 min{dfs.blockSize(默认60MB),mapreduce.input.fileinputformat.split.maxsize(默认Long.MAX_VALUE)}}
 		 * 
 		 * 分片大小和map的关系，伪代码为：
 		 * while (fileSize / splitSize > 1.1) {
@@ -140,7 +132,6 @@ public class MRHander extends BaseHandler {
 		 * 
 		 * 预计一行平均小于150字节，则splitSize为maxsize，可以保证每个中间文件只由一个map处理
 		 */
-		jobConf.setLong("mapred.min.split.size", 1L);
 		jobConf.setLong("mapreduce.input.fileinputformat.split.minsize", 1L);
 		jobConf.setLong("mapreduce.input.fileinputformat.split.maxsize", 150 * filesPerTask);
 		
@@ -153,14 +144,14 @@ public class MRHander extends BaseHandler {
 
 	private void ConfigJob(Job job) throws IOException {
 		job.setJobName("PutHbaseJOB_" + record.getName() +"_"+ new SimpleDateFormat("yyyyMM").format(new Date()));
-		job.setMapperClass(Map.class);
+		job.setMapperClass(MRHandlerMap.class);
 		job.setOutputKeyClass(Text.class);
 		job.setOutputValueClass(Text.class);
 		job.setOutputFormatClass(NullOutputFormat.class);
 		job.setNumReduceTasks(0);
 		job.setJarByClass(MainApp.class);
-		TableMapReduceUtil.addDependencyJars(job);
-		TableMapReduceUtil.initCredentials(job);
+//		TableMapReduceUtil.addDependencyJars(job);
+//		TableMapReduceUtil.initCredentials(job);
 	}
 
 	public boolean getIsShardByFileNum() {
@@ -239,49 +230,6 @@ public class MRHander extends BaseHandler {
 
 	}
 	
-	public static class Map extends Mapper<LongWritable, Text, Text, IntWritable> {
-		protected static final Logger logger = LoggerFactory.getLogger(Map.class);
-		private Record record;
-		private String maxFileHandlePath;
-		private Long maxFileSize;
-		private String detailOutputFileName = "";
-		private String detailOutputPath;
-		private String inputBakPath;
-
-		@Override
-		protected void setup(Context context) throws IOException, InterruptedException {
-			logger.info("init");
-			maxFileHandlePath = context.getConfiguration().get("maxFileHandlePath");
-			maxFileSize = Long.valueOf(context.getConfiguration().get("maxFileSize"));
-			detailOutputPath = context.getConfiguration().get("detailOutputPath");
-			inputBakPath = context.getConfiguration().get("inputBakPath");
-			// Record.class待验证是否为具体实现类
-			record = DefaultStringifier.load(hbaseConfiguration, "key", Record.class);
-		}
-
-		@Override
-		protected void cleanup(Context context) throws IOException, InterruptedException {
-			
-			NormalCleanUp(record, maxFileHandlePath, detailOutputPath, detailOutputFileName);
-		}
-
-		@Override
-		protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
-			logger.info("contents is:" + value.toString());
-			String[] fileInfo = value.toString().split(":");
-			
-			NormalProcessOneFile(context.getConfiguration(), record, fileInfo, maxFileHandlePath, 
-					maxFileSize, detailOutputPath, inputBakPath, detailOutputFileName, context.getJobID().toString());
-		}
-
-	}
-
-	public static class Reduce extends Reducer<Text, IntWritable, Text, IntWritable> {
-		@Override
-		protected void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException,
-				InterruptedException {
-
-		}
-	}
-
 }
+
+

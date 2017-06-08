@@ -26,14 +26,14 @@ public class MainApp {
 			e.printStackTrace();
 			appContext.close();
 			return;
-		}
+		} 
 
 		// 启动每个业务
-		BaseHandler.setAppContext(appContext);
 		BaseHandler.setHbaseConfiguration(Constant.getHadoopConfig());
 		BaseHandler.setConnection(Constant.getConnection());
 		BaseHandler bean = (BaseHandler) appContext.getBean("realHander");
 		bean.run();
+		appContext.close();
 	}
 
 }

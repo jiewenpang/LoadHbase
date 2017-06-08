@@ -11,11 +11,6 @@ import org.apache.hadoop.hbase.client.Table;
 public class BillRecord extends Record {
 	private static final String START = "START|";
 	private static final String END = "END";
-	private static final int ACCNO_INDEX = 0;
-	private static final int MOBNO_INDEX = 2;
-	private static final int DATE_INDEX = 4;
-	private static final int VERSION_INDEX = -5;
-	private static final int TYPE_INDEX = -4;
 	private static final String DELIMITER = "|";
 	private static final String BODY_ITEM_DELIMITER = "^";
 
@@ -105,11 +100,11 @@ public class BillRecord extends Record {
 	private void parseHeader(String header) {
 		String[] splitHeader = header.split("\\|");
 
-		acctNo = GetByIndex(splitHeader, ACCNO_INDEX);
-		mobNo = GetByIndex(splitHeader, MOBNO_INDEX);
-		yearMonth = GetByIndex(splitHeader, DATE_INDEX);
-		version = isBillVerionOne ? "" : GetByIndex(splitHeader, VERSION_INDEX);
-		type = isBillVerionOne ? "" : GetByIndex(splitHeader, TYPE_INDEX);
+		acctNo = GetByIndex(splitHeader, 0);
+		mobNo = GetByIndex(splitHeader, 2);
+		yearMonth = GetByIndex(splitHeader, 4);
+		version = isBillVerionOne ? "" : GetByIndex(splitHeader, -5);
+		type = isBillVerionOne ? "" : GetByIndex(splitHeader, -4);
 	}
 
 	private String GetByIndex(String[] splitHeader, int index) {

@@ -27,8 +27,6 @@ import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.support.FileSystemXmlApplicationContext;
 
 import com.asiainfo.loadhbase.resource.Record;
 import com.asiainfo.loadhbase.tool.RemoteTools;
@@ -36,7 +34,6 @@ import com.asiainfo.loadhbase.tool.LCompress;
 
 public abstract class BaseHandler {
 	protected static final Logger logger = LoggerFactory.getLogger(BaseHandler.class);
-	protected static FileSystemXmlApplicationContext appContext;
 	protected static Configuration hbaseConfiguration;
 	protected static Connection connection;
 	protected static FileSystem fileSystem;
@@ -265,14 +262,6 @@ public abstract class BaseHandler {
 		return tofiledir;
 	}
 	
-	public static ApplicationContext getAppContext() {
-		return appContext;
-	}
-
-	public static void setAppContext(FileSystemXmlApplicationContext appContext) {
-		BaseHandler.appContext = appContext;
-	}
-
 	public static Configuration getHbaseConfiguration() {
 		return hbaseConfiguration;
 	}

@@ -35,12 +35,14 @@ public abstract class Record implements Writable {
 	protected String[] familys;
 	protected String[] columns;
 	protected String[] regions;
+	protected Map<String, Table> mapTable = new HashMap<String, Table>();
+	
+	// 以下参数不需要序列化，仅利于按业务进行配置化
 	protected String ftpInfo;
 	protected String inputHdfsPath;
 	protected String inputBakPath;
 	protected String detailOutputPath;
 	protected String maxFileHandlePath;
-	protected Map<String, Table> mapTable = new HashMap<String, Table>();
 	
 	public abstract boolean checkFileName(String name);
 
@@ -54,26 +56,27 @@ public abstract class Record implements Writable {
     	tx.readFields(arg0);
     	tableNamePrefix = tx.toString();
     	
-    	aw.readFields(arg0);
-    	familys = aw.toStrings();
-
-    	aw.readFields(arg0);
-    	columns = aw.toStrings();
-    	
-    	aw.readFields(arg0);
-    	regions = aw.toStrings();
-
     	tx.readFields(arg0);
     	filterRegion = tx.toString();
+    	
+//    	aw.readFields(arg0);
+//    	familys = aw.toStrings();
+//
+//    	aw.readFields(arg0);
+//    	columns = aw.toStrings();
+//    	
+//    	aw.readFields(arg0);
+//    	regions = aw.toStrings();
+
 	}
 	
 	@Override
 	public void write(DataOutput arg0) throws IOException {
 		new Text(tableNamePrefix).write(arg0);
-		GetArrayText(familys).write(arg0);
-		GetArrayText(columns).write(arg0);
-		GetArrayText(regions).write(arg0);
 		new Text(filterRegion).write(arg0);
+//		GetArrayText(familys).write(arg0);
+//		GetArrayText(columns).write(arg0);
+//		GetArrayText(regions).write(arg0);
 	}
 	
 	private ArrayWritable GetArrayText(String[] strings) {
