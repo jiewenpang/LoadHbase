@@ -88,7 +88,7 @@
 	</bean>
 
 	<bean id="bossRecord223" class="com.asiainfo.loadhbase.resource.BOSSRecord">
-		<property name="name" value="bossRecord" />
+		<property name="name" value="bossRecord223" />
 		<property name="ftpInfo"			value="172.16.1.223:22:hadoop:hadoop:/tmp/pjw/boss,172.16.1.225:22:hadoop:hadoop:/tmp/pjw/boss" />
 		<property name="inputHdfsPath"		value="/tmp/pjw/boss" />
 		<property name="maxFileHandlePath"	value="/tmp/pjw/maxfile" />
@@ -119,6 +119,38 @@
 		</property>
 	</bean>
 
+	<bean id="bossRecordSSCS" class="com.asiainfo.loadhbase.resource.BOSSRecord">
+		<property name="name" 				value="bossRecord" />
+		<property name="ftpInfo"			value="172.32.0.2:22:bd_qzdzx:gmcc1234:/tmp/pjw/boss" />
+		<property name="inputHdfsPath" 		value="/tmp/pjw/boss" />
+		<property name="maxFileHandlePath" 	value="/tmp/pjw/maxfile" />
+		<property name="inputBakPath" 		value="/tmp/pjw/inputbak" />
+		<property name="tableNamePrefix" 	value="BOSS_" />
+		<property name="filterRegion" 		value="999" />
+		<property name="familys">
+			<list>
+				<value>INFO</value>
+			</list>
+		</property>
+		<property name="columns">
+			<list>
+				<value>EventFormatType</value>
+				<value>Area</value>
+				<value>Cdr</value>
+			</list>
+		</property>
+		<property name="regions">
+			<list>
+				<value>134</value>
+				<value>135</value>
+				<value>136</value>
+				<value>137</value>
+				<value>138</value>
+				<value>139</value>
+			</list>
+		</property>
+	</bean>
+        
 	<bean id="bossRecord" class="com.asiainfo.loadhbase.resource.BOSSRecord">
 		<property name="name" 				value="bossRecord" />
 		<property name="ftpInfo"			value="192.252.106.49:21:qzd_qd:Audi@369:/data01/HZ_boss_210,192.252.106.50:21:qzd_qd:Audi@369:/data01/HZ_boss_211,192.252.106.51:21:qzd_qd:Audi@369:/data01/HZ_boss_212,192.252.106.52:21:qzd_qd:Audi@369:/data01/HZ_boss_213,192.252.106.50:21:qzd_qd:Audi@369:/data02/HZ_boss_211,192.252.106.49:21:qzd_qd:Audi@369:/data02/BOSS/HZ_boss_210,192.252.106.52:21:qzd_qd:Audi@369:/data02/HZ_boss_213,192.252.106.51:21:qzd_qd:Audi@369:/data02/HZ_boss_212" />

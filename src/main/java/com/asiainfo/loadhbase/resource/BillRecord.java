@@ -126,4 +126,5 @@ public class BillRecord extends Record {
 		}
 		return rowKey.toString();
 	}
+
 }

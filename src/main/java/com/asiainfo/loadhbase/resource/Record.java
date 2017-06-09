@@ -45,7 +45,6 @@ public abstract class Record implements Writable {
 	protected String maxFileHandlePath;
 	
 	public abstract boolean checkFileName(String name);
-
 	public abstract int buildRecord(String filename, BufferedReader br, Connection connection) throws Exception;
 
 	@Override
@@ -59,14 +58,14 @@ public abstract class Record implements Writable {
     	tx.readFields(arg0);
     	filterRegion = tx.toString();
     	
-//    	aw.readFields(arg0);
-//    	familys = aw.toStrings();
-//
-//    	aw.readFields(arg0);
-//    	columns = aw.toStrings();
-//    	
-//    	aw.readFields(arg0);
-//    	regions = aw.toStrings();
+    	aw.readFields(arg0);
+    	familys = aw.toStrings();
+
+    	aw.readFields(arg0);
+    	columns = aw.toStrings();
+    	
+    	aw.readFields(arg0);
+    	regions = aw.toStrings();
 
 	}
 	
@@ -74,9 +73,9 @@ public abstract class Record implements Writable {
 	public void write(DataOutput arg0) throws IOException {
 		new Text(tableNamePrefix).write(arg0);
 		new Text(filterRegion).write(arg0);
-//		GetArrayText(familys).write(arg0);
-//		GetArrayText(columns).write(arg0);
-//		GetArrayText(regions).write(arg0);
+		GetArrayText(familys).write(arg0);
+		GetArrayText(columns).write(arg0);
+		GetArrayText(regions).write(arg0);
 	}
 	
 	private ArrayWritable GetArrayText(String[] strings) {

@@ -106,18 +106,17 @@ public class MRHander extends BaseHandler {
 		}
 	}
 
-	private void IndividuationJobConf(JobConf jobConf) {
+	private void IndividuationJobConf(JobConf jobConf) throws IOException {
 		jobConf.set("maxFileSize", maxFileSize);
 		jobConf.set("maxFileHandlePath", maxFileHandlePath);
 		jobConf.set("inputBakPath", inputBakPath);
 		jobConf.set("detailOutputPath", detailOutputPath);
+		jobConf.set("concreteRecordName", record.getClass().getName());
 
-		// 单位ms，默认10分钟，但此处设置为1小时
-		jobConf.setInt("mapreduce.task.timeout", 3600000);
-		// 一般配置为cpu核心数，但需要考虑IO和不影响实时任务
-		jobConf.setLong("mapreduce.tasktracker.map.tasks.maximum", maxTaskPerNode);
-		// mapper允许tasktracker失败的百分比
-		jobConf.setInt("mapreduce.map.failures.maxpercent", 20);
+		
+		jobConf.setInt("mapreduce.task.timeout", 3600000); // 单位ms，默认10分钟，此处设置为1小时
+		jobConf.setLong("mapreduce.tasktracker.map.tasks.maximum", maxTaskPerNode); // 一般配置为cpu核心数，但需要考虑不影响实时任务
+		jobConf.setInt("mapreduce.map.failures.maxpercent", 20); // mapper允许tasktracker失败的百分比
 		
 		/*
 		 * splitSize=max{max{minSplitSize(默认为1B),mapreduce.input.fileinputformat.split.minsize}, 
@@ -135,11 +134,7 @@ public class MRHander extends BaseHandler {
 		jobConf.setLong("mapreduce.input.fileinputformat.split.minsize", 1L);
 		jobConf.setLong("mapreduce.input.fileinputformat.split.maxsize", 150 * filesPerTask);
 		
-    	try {
-			DefaultStringifier.store(jobConf, record ,"record");
-		} catch (IOException e) {
-			logger.warn("", e);
-		}
+		DefaultStringifier.store(jobConf, record ,"record");
 	}
 
 	private void ConfigJob(Job job) throws IOException {

@@ -21,6 +21,7 @@ public class MRHandlerMap extends Mapper<LongWritable, Text, Text, IntWritable> 
 	private String detailOutputFileName = "";
 	private String detailOutputPath;
 	private String inputBakPath;
+	private String concreteRecordName;
 
 	@Override
 	protected void setup(Context context) throws IOException, InterruptedException {
@@ -30,13 +31,12 @@ public class MRHandlerMap extends Mapper<LongWritable, Text, Text, IntWritable> 
 		maxFileSize = Long.valueOf(connection.get("maxFileSize"));
 		detailOutputPath = connection.get("detailOutputPath");
 		maxFileHandlePath = connection.get("maxFileHandlePath");
+		concreteRecordName = connection.get("concreteRecordName");
 		
-		// Record.class待验证是否为具体实现类
 		try {
-			record = DefaultStringifier.load(connection, "record", Record.class);
-
-		} catch (java.lang.NullPointerException e) {
-			logger.error("hbaseConfiguration:" + connection + ", Record.class" + Record.class, e);
+			record = (Record) DefaultStringifier.load(connection, "record", Class.forName(concreteRecordName));
+		} catch (ClassNotFoundException e) {
+			logger.error("concreteRecordName="+concreteRecordName, e);
 			throw new InterruptedException();
 		}
 	}
